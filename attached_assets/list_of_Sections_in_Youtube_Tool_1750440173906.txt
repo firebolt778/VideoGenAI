@@ -1,0 +1,16 @@
+This is the list of sections I'd need in the tool
+
+
+Channels (list of channels added to the tool)
+
+↳ Add New Channel (Page to add a new channel to the tool)
+
+Video Templates (Section where the individual video template types exist. Only "Story Video Template" will be made for now. Allows you to change settings and save as a custom version, for example "Ghost Story videos")
+
+Thumbnails (section where the thumbnail types are made and saved. Can then be selected and used by channels)
+
+Hooks (not sure if it needs it's own page yet. Function to create and save various hook types, short scenes that are added to the very beginning of the video to capture the viewers attention. These can then be selected at the channel level.)
+
+Log/Debug (page that shows a log of events, or any issues. Can auto delete after 7 days)
+
+Stats (shows stats for all channels, or can view stats for single channel.)
