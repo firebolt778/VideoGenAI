@@ -33,7 +33,7 @@ export class ElevenLabsService {
       const data = await response.json();
       return data.voices || [];
     } catch (error) {
-      throw new Error(`Failed to fetch voices: ${error.message}`);
+      throw new Error(`Failed to fetch voices: ${(error as Error).message}`);
     }
   }
 
@@ -80,7 +80,7 @@ export class ElevenLabsService {
         duration: this.estimateAudioDuration(text) // Rough estimation
       };
     } catch (error) {
-      throw new Error(`Failed to generate audio: ${error.message}`);
+      throw new Error(`Failed to generate audio: ${(error as Error).message}`);
     }
   }
 

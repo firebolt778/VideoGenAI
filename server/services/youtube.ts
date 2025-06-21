@@ -56,7 +56,7 @@ export class YouTubeService {
       const { tokens } = await this.oauth2Client.getToken(code);
       this.oauth2Client.setCredentials(tokens);
     } catch (error) {
-      throw new Error(`Failed to set YouTube credentials: ${error.message}`);
+      throw new Error(`Failed to set YouTube credentials: ${(error as Error).message}`);
     }
   }
 
@@ -92,7 +92,7 @@ export class YouTubeService {
 
       return videoId;
     } catch (error) {
-      throw new Error(`Failed to upload video to YouTube: ${error.message}`);
+      throw new Error(`Failed to upload video to YouTube: ${(error as Error).message}`);
     }
   }
 
@@ -107,7 +107,7 @@ export class YouTubeService {
         },
       });
     } catch (error) {
-      throw new Error(`Failed to upload thumbnail: ${error.message}`);
+      throw new Error(`Failed to upload thumbnail: ${(error as Error).message}`);
     }
   }
 
@@ -132,7 +132,7 @@ export class YouTubeService {
         videoCount: channel.statistics.videoCount,
       };
     } catch (error) {
-      throw new Error(`Failed to get channel info: ${error.message}`);
+      throw new Error(`Failed to get channel info: ${(error as Error).message}`);
     }
   }
 
@@ -145,7 +145,7 @@ export class YouTubeService {
 
       return response.data.items?.[0] || null;
     } catch (error) {
-      throw new Error(`Failed to get video stats: ${error.message}`);
+      throw new Error(`Failed to get video stats: ${(error as Error).message}`);
     }
   }
 
@@ -162,7 +162,7 @@ export class YouTubeService {
         },
       });
     } catch (error) {
-      throw new Error(`Failed to schedule video: ${error.message}`);
+      throw new Error(`Failed to schedule video: ${(error as Error).message}`);
     }
   }
 }

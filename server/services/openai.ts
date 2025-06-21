@@ -64,7 +64,7 @@ Respond with JSON in this exact format:
       const result = JSON.parse(response.choices[0].message.content || "{}");
       return result as StoryOutline;
     } catch (error) {
-      throw new Error(`Failed to generate story outline: ${error.message}`);
+      throw new Error(`Failed to generate story outline: ${(error as Error).message}`);
     }
   }
 
@@ -114,7 +114,7 @@ Enclose the script content between --- markers like this:
       
       return content;
     } catch (error) {
-      throw new Error(`Failed to generate full script: ${error.message}`);
+      throw new Error(`Failed to generate full script: ${(error as Error).message}`);
     }
   }
 
@@ -161,7 +161,7 @@ Respond with JSON in this exact format:
       const result = JSON.parse(response.choices[0].message.content || "{}");
       return result.images || [];
     } catch (error) {
-      throw new Error(`Failed to generate image prompts: ${error.message}`);
+      throw new Error(`Failed to generate image prompts: ${(error as Error).message}`);
     }
   }
 
@@ -210,7 +210,7 @@ Respond with JSON in this exact format:
       const result = JSON.parse(response.choices[0].message.content || "{}");
       return result.assignments || [];
     } catch (error) {
-      throw new Error(`Failed to assign images to script: ${error.message}`);
+      throw new Error(`Failed to assign images to script: ${(error as Error).message}`);
     }
   }
 
@@ -250,7 +250,7 @@ Keep it under 1000 characters.`;
 
       return response.choices[0].message.content || "";
     } catch (error) {
-      throw new Error(`Failed to generate video description: ${error.message}`);
+      throw new Error(`Failed to generate video description: ${(error as Error).message}`);
     }
   }
 
@@ -288,7 +288,7 @@ Create a single, detailed prompt for thumbnail generation.`;
 
       return response.choices[0].message.content || "";
     } catch (error) {
-      throw new Error(`Failed to generate thumbnail prompt: ${error.message}`);
+      throw new Error(`Failed to generate thumbnail prompt: ${(error as Error).message}`);
     }
   }
 }

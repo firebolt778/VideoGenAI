@@ -68,7 +68,7 @@ export class FluxService {
         throw new Error(`Image generation failed: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
-      throw new Error(`Failed to generate image with Flux: ${error.message}`);
+      throw new Error(`Failed to generate image with Flux: ${(error as Error).message}`);
     }
   }
 
@@ -143,7 +143,7 @@ export class FluxService {
       
       return filename;
     } catch (error) {
-      throw new Error(`Failed to save image: ${error.message}`);
+      throw new Error(`Failed to save image: ${(error as Error).message}`);
     }
   }
 
@@ -156,7 +156,7 @@ export class FluxService {
     try {
       return await this.generateImage({ prompt });
     } catch (fluxError) {
-      console.log('Flux generation failed, falling back to DALL-E 3:', fluxError.message);
+      console.log('Flux generation failed, falling back to DALL-E 3:', (fluxError as Error).message);
       
       try {
         // Import OpenAI service for fallback
@@ -173,7 +173,7 @@ export class FluxService {
           quality: "standard",
         });
 
-        const imageUrl = response.data[0].url;
+        const imageUrl = response.data?.[0].url;
         if (!imageUrl) {
           throw new Error('No image URL returned from DALL-E');
         }
@@ -186,7 +186,7 @@ export class FluxService {
           prompt
         };
       } catch (dalleError) {
-        throw new Error(`Both Flux and DALL-E generation failed: ${fluxError.message}, ${dalleError.message}`);
+        throw new Error(`Both Flux and DALL-E generation failed: ${(fluxError as Error).message}, ${(dalleError as Error).message}`);
       }
     }
   }

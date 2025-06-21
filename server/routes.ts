@@ -76,7 +76,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/channels", async (req, res) => {
     try {
       const validatedData = insertChannelSchema.parse(req.body);
+      console.log('--------------------------');
+      console.log(validatedData);
       const channel = await storage.createChannel(validatedData);
+      console.log('-------------------------')
+      console.log(channel)
       
       // Log channel creation
       await storage.createJobLog({
@@ -88,7 +92,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.status(201).json(channel);
     } catch (error) {
-      res.status(400).json({ message: error.message || "Failed to create channel" });
+      res.status(400).json({ message: (error as Error).message || "Failed to create channel" });
     }
   });
 
@@ -112,7 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(channel);
     } catch (error) {
-      res.status(400).json({ message: error.message || "Failed to update channel" });
+      res.status(400).json({ message: (error as Error).message || "Failed to update channel" });
     }
   });
 
@@ -217,7 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.status(201).json(template);
     } catch (error) {
-      res.status(400).json({ message: error.message || "Failed to create template" });
+      res.status(400).json({ message: (error as Error).message || "Failed to create template" });
     }
   });
 
@@ -233,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(template);
     } catch (error) {
-      res.status(400).json({ message: error.message || "Failed to update template" });
+      res.status(400).json({ message: (error as Error).message || "Failed to update template" });
     }
   });
 
@@ -268,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const template = await storage.createThumbnailTemplate(validatedData);
       res.status(201).json(template);
     } catch (error) {
-      res.status(400).json({ message: error.message || "Failed to create thumbnail template" });
+      res.status(400).json({ message: (error as Error).message || "Failed to create thumbnail template" });
     }
   });
 
@@ -288,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const template = await storage.createHookTemplate(validatedData);
       res.status(201).json(template);
     } catch (error) {
-      res.status(400).json({ message: error.message || "Failed to create hook template" });
+      res.status(400).json({ message: (error as Error).message || "Failed to create hook template" });
     }
   });
 
@@ -432,9 +436,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const details = latestLog.details as ({ [key: string]: string } | undefined);
+
       res.json({
-        stage: latestLog.details?.stage || "unknown",
-        progress: latestLog.details?.progress || 0,
+        stage: details?.stage || "unknown",
+        progress: details?.progress || 0,
         message: latestLog.message,
         status: video.status,
         error: video.errorMessage

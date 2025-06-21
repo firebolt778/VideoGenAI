@@ -56,10 +56,7 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
 
   const createChannelMutation = useMutation({
     mutationFn: async (data: InsertChannel) => {
-      return apiRequest("/api/channels", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/channels", data);
     },
     onSuccess: () => {
       toast({ title: "Channel created successfully" });
@@ -405,7 +402,7 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                       />
                     </FormControl>
                     <p className="text-sm text-muted-foreground">
-                      Available shortcodes: {{TITLE}}, {{SCRIPT}}, {{CHANNEL_NAME}}, {{CHANNEL_DESCRIPTION}}
+                      {"Available shortcodes: {{TITLE}}, {{SCRIPT}}, {{CHANNEL_NAME}}, {{CHANNEL_DESCRIPTION}}"}
                     </p>
                     <FormMessage />
                   </FormItem>

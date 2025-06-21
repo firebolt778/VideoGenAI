@@ -92,7 +92,7 @@
   }
 
   .nav-link-active {
-    @apply nav-link bg-primary bg-opacity-10 text-primary;
+    @apply nav-link bg-primary bg-opacity-10 text-white;
   }
 
   .nav-link-inactive {

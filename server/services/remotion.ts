@@ -55,7 +55,7 @@ export class RemotionService {
         webpackOverride: (config) => config,
       });
     } catch (error) {
-      throw new Error(`Failed to initialize Remotion bundle: ${error.message}`);
+      throw new Error(`Failed to initialize Remotion bundle: ${(error as Error).message}`);
     }
   }
 
@@ -98,7 +98,7 @@ export class RemotionService {
 
       return outputPath;
     } catch (error) {
-      throw new Error(`Failed to render video: ${error.message}`);
+      throw new Error(`Failed to render video: ${(error as Error).message}`);
     }
   }
 
@@ -286,7 +286,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
           .on('error', reject);
       });
     } catch (error) {
-      throw new Error(`Failed to generate thumbnail: ${error.message}`);
+      throw new Error(`Failed to generate thumbnail: ${(error as Error).message}`);
     }
   }
 }
