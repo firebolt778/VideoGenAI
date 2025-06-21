@@ -10,6 +10,7 @@ import Hooks from "@/pages/hooks";
 import Logs from "@/pages/logs";
 import Analytics from "@/pages/analytics";
 import NotFound from "@/pages/not-found";
+import Settings from "@/pages/settings";
 import Sidebar from "@/components/layout/sidebar";
 
 function Router() {
@@ -26,6 +27,7 @@ function Router() {
           <Route path="/hooks" component={Hooks} />
           <Route path="/logs" component={Logs} />
           <Route path="/analytics" component={Analytics} />
+          <Route path="/settings" component={Settings} />
           <Route component={NotFound} />
         </Switch>
       </main>

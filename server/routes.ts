@@ -451,6 +451,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Settings endpoints
+  app.get("/api/settings", async (req, res) => {
+    try {
+      const settings = await storage.listSettings();
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  app.get("/api/settings/:key", async (req, res) => {
+    try {
+      const setting = await storage.getSetting(req.params.key);
+      if (!setting) return res.status(404).json({ message: "Setting not found" });
+      res.json(setting);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch setting" });
+    }
+  });
+
+  app.post("/api/settings/:key", async (req, res) => {
+    try {
+      const { value, jsonValue } = req.body;
+      const setting = await storage.setSetting(req.params.key, value ?? null, jsonValue);
+      res.status(201).json(setting);
+    } catch (error) {
+      res.status(400).json({ message: (error as Error).message || "Failed to set setting" });
+    }
+  });
+
+  app.delete("/api/settings/:key", async (req, res) => {
+    try {
+      // For simplicity, just set value and jsonValue to null
+      const setting = await storage.setSetting(req.params.key, null, null);
+      res.status(204).json(setting);
+    } catch (error) {
+      res.status(400).json({ message: (error as Error).message || "Failed to delete setting" });
+    }
+  });
+
   // Serve uploaded files
   app.use('/uploads', express.static('uploads'));
 

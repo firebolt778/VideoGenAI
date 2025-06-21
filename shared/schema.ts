@@ -156,6 +156,14 @@ export const uploadedAssets = pgTable("uploaded_assets", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const settings = pgTable("settings", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(), // e.g. 'openai_api_key', 'replicate_api_key', 'model_list'
+  value: text("value"), // for string values like API keys
+  jsonValue: jsonb("json_value"), // for storing lists or objects (e.g. model lists)
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const channelsRelations = relations(channels, ({ many }) => ({
   videos: many(videos),
@@ -246,6 +254,9 @@ export const insertUploadedAssetSchema = createInsertSchema(uploadedAssets).omit
   createdAt: true,
 });
 
+export const insertSettingsSchema = createInsertSchema(settings);
+export const updateSettingsSchema = insertSettingsSchema.partial();
+
 // Types
 export type Channel = typeof channels.$inferSelect;
 export type InsertChannel = z.infer<typeof insertChannelSchema>;
@@ -261,3 +272,5 @@ export type JobLog = typeof jobLogs.$inferSelect;
 export type InsertJobLog = z.infer<typeof insertJobLogSchema>;
 export type UploadedAsset = typeof uploadedAssets.$inferSelect;
 export type InsertUploadedAsset = z.infer<typeof insertUploadedAssetSchema>;
+export type Setting = typeof settings.$inferSelect;
+export type InsertSetting = z.infer<typeof insertSettingsSchema>;

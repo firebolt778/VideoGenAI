@@ -7,7 +7,8 @@ import {
   PlayCircle, 
   ListChecks, 
   BarChart3, 
-  User 
+  User,
+  Settings as SettingsIcon
 } from "lucide-react";
 
 const navigation = [
@@ -18,6 +19,7 @@ const navigation = [
   { name: 'Hooks', href: '/hooks', icon: PlayCircle },
   { name: 'Logs & Debug', href: '/logs', icon: ListChecks },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Settings', href: '/settings', icon: SettingsIcon },
 ];
 
 export default function Sidebar() {

@@ -18,7 +18,9 @@ import {
   type Video,
   type InsertVideo,
   type JobLog,
-  type InsertJobLog
+  type InsertJobLog,
+  type Setting,
+  settings
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -71,6 +73,11 @@ export interface IStorage {
   removeThumbnailFromChannel(channelId: number, thumbnailId: number): Promise<void>;
   getChannelTemplates(channelId: number): Promise<VideoTemplate[]>;
   getChannelThumbnails(channelId: number): Promise<ThumbnailTemplate[]>;
+  
+  // Settings
+  getSetting(key: string): Promise<Setting | undefined>;
+  setSetting(key: string, value: string | null, jsonValue?: any): Promise<Setting>;
+  listSettings(): Promise<Setting[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -294,6 +301,32 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(channelThumbnails, eq(thumbnailTemplates.id, channelThumbnails.thumbnailId))
       .where(eq(channelThumbnails.channelId, channelId));
     return result.map(r => r.thumbnail_templates);
+  }
+
+  // Settings
+  async getSetting(key: string): Promise<Setting | undefined> {
+    const [setting] = await db.select().from(settings).where(eq(settings.key, key));
+    return setting || undefined;
+  }
+
+  async setSetting(key: string, value: string | null, jsonValue?: any): Promise<Setting> {
+    const [existing] = await db.select().from(settings).where(eq(settings.key, key));
+    if (existing) {
+      const [updated] = await db.update(settings)
+        .set({ value, jsonValue, updatedAt: new Date() })
+        .where(eq(settings.key, key))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(settings)
+        .values({ key, value, jsonValue, updatedAt: new Date() })
+        .returning();
+      return created;
+    }
+  }
+
+  async listSettings(): Promise<Setting[]> {
+    return await db.select().from(settings);
   }
 }
 
