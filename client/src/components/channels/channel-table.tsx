@@ -23,9 +23,10 @@ interface ChannelTableProps {
   isLoading: boolean;
   onRefresh: () => void;
   onEdit: (channel: Channel) => void;
+  onTestVideo: (channel: Channel) => void;
 }
 
-export default function ChannelTable({ channels, isLoading, onRefresh, onEdit }: ChannelTableProps) {
+export default function ChannelTable({ channels, isLoading, onRefresh, onEdit, onTestVideo }: ChannelTableProps) {
   const { toast } = useToast();
   const [testingChannelId, setTestingChannelId] = useState<number | null>(null);
 
@@ -224,7 +225,7 @@ export default function ChannelTable({ channels, isLoading, onRefresh, onEdit }:
                         size="sm"
                         className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700"
                         title="Test Video"
-                        onClick={() => handleTestVideo(channel.id)}
+                        onClick={() => onTestVideo(channel)}
                         disabled={testingChannelId === channel.id}
                       >
                         <Play className="h-4 w-4" />

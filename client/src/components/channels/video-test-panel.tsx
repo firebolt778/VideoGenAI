@@ -30,10 +30,6 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
     queryKey: ['/api/video-templates'],
   });
 
-  const { data: channelTemplates } = useQuery({
-    queryKey: [`/api/channels/${channel.id}/templates`],
-  });
-
   const generateTestVideoMutation = useMutation({
     mutationFn: async ({ channelId, templateId }: { channelId: number; templateId: number }) => {
       const response = await apiRequest("POST", "/api/generate-video", {
@@ -86,10 +82,6 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
     });
   };
 
-  const availableTemplates = templates?.filter(t => 
-    channelTemplates?.some((ct: any) => ct.templateId === t.id)
-  ) || [];
-
   const getStageIcon = (stage: string) => {
     switch (stage) {
       case "complete":
@@ -141,7 +133,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
               <SelectValue placeholder="Choose a video template" />
             </SelectTrigger>
             <SelectContent>
-              {availableTemplates.map((template) => (
+              {templates?.map((template) => (
                 <SelectItem key={template.id} value={template.id.toString()}>
                   <div className="flex items-center justify-between w-full">
                     <span>{template.name}</span>
