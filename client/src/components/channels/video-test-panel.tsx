@@ -36,20 +36,17 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
 
   const generateTestVideoMutation = useMutation({
     mutationFn: async ({ channelId, templateId }: { channelId: number; templateId: number }) => {
-      const response = await apiRequest("/api/generate-video", {
-        method: "POST",
-        body: JSON.stringify({
-          channelId,
-          templateId,
-          testMode: true
-        }),
+      const response = await apiRequest("POST", "/api/generate-video", {
+        channelId,
+        templateId,
+        testMode: true
       });
       return response;
     },
-    onSuccess: (data) => {
+    onSuccess: (res) => {
       toast({ title: "Test video generation started" });
       // Start polling for progress
-      pollProgress(data.videoId);
+      res.json().then((data) => pollProgress(data.videoId));
     },
     onError: () => {
       toast({ title: "Failed to start test generation", variant: "destructive" });
@@ -59,7 +56,8 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
   const pollProgress = (videoId: number) => {
     const interval = setInterval(async () => {
       try {
-        const progress = await apiRequest(`/api/videos/${videoId}/progress`);
+        const response = await apiRequest("GET", `/api/videos/${videoId}/progress`);
+        const progress: TestProgress & { error?: string } = await response.json();
         setTestProgress(progress);
         
         if (progress.progress >= 100 || progress.error) {

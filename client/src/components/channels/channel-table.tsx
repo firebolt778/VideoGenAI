@@ -22,9 +22,10 @@ interface ChannelTableProps {
   channels: Channel[];
   isLoading: boolean;
   onRefresh: () => void;
+  onEdit: (channel: Channel) => void;
 }
 
-export default function ChannelTable({ channels, isLoading, onRefresh }: ChannelTableProps) {
+export default function ChannelTable({ channels, isLoading, onRefresh, onEdit }: ChannelTableProps) {
   const { toast } = useToast();
   const [testingChannelId, setTestingChannelId] = useState<number | null>(null);
 
@@ -214,6 +215,7 @@ export default function ChannelTable({ channels, isLoading, onRefresh }: Channel
                         size="sm"
                         className="h-8 w-8 p-0"
                         title="Edit Channel"
+                        onClick={() => onEdit(channel)}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>

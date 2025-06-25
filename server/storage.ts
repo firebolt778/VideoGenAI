@@ -23,7 +23,7 @@ import {
   settings
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   // Channels
@@ -110,7 +110,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteChannel(id: number): Promise<boolean> {
     const result = await db.delete(channels).where(eq(channels.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Video Templates
@@ -142,7 +142,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteVideoTemplate(id: number): Promise<boolean> {
     const result = await db.delete(videoTemplates).where(eq(videoTemplates.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Thumbnail Templates
@@ -174,7 +174,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteThumbnailTemplate(id: number): Promise<boolean> {
     const result = await db.delete(thumbnailTemplates).where(eq(thumbnailTemplates.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Hook Templates
@@ -206,7 +206,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteHookTemplate(id: number): Promise<boolean> {
     const result = await db.delete(hookTemplates).where(eq(hookTemplates.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Videos
@@ -242,7 +242,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteVideo(id: number): Promise<boolean> {
     const result = await db.delete(videos).where(eq(videos.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Job Logs
@@ -271,8 +271,12 @@ export class DatabaseStorage implements IStorage {
 
   async removeTemplateFromChannel(channelId: number, templateId: number): Promise<void> {
     await db.delete(channelTemplates)
-      .where(eq(channelTemplates.channelId, channelId))
-      .where(eq(channelTemplates.templateId, templateId));
+      .where(
+        and(
+          eq(channelTemplates.channelId, channelId),
+          eq(channelTemplates.templateId, templateId)
+        )
+      );
   }
 
   async addThumbnailToChannel(channelId: number, thumbnailId: number): Promise<void> {
@@ -281,8 +285,12 @@ export class DatabaseStorage implements IStorage {
 
   async removeThumbnailFromChannel(channelId: number, thumbnailId: number): Promise<void> {
     await db.delete(channelThumbnails)
-      .where(eq(channelThumbnails.channelId, channelId))
-      .where(eq(channelThumbnails.thumbnailId, thumbnailId));
+      .where(
+        and(
+          eq(channelThumbnails.channelId, channelId),
+          eq(channelThumbnails.thumbnailId, thumbnailId)
+        )
+      );
   }
 
   async getChannelTemplates(channelId: number): Promise<VideoTemplate[]> {

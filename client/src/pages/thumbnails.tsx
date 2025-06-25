@@ -2,19 +2,23 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertThumbnailTemplateSchema, type InsertThumbnailTemplate, type ThumbnailTemplate } from "@shared/schema";
+import {
+  insertThumbnailTemplateSchema,
+  type InsertThumbnailTemplate,
+  type ThumbnailTemplate,
+} from "@shared/schema";
 import Header from "@/components/layout/header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
   Dialog,
@@ -33,18 +37,29 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Edit, Trash2, Plus, TestTube } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function Thumbnails() {
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<ThumbnailTemplate | null>(null);
+  const [editingTemplate, setEditingTemplate] =
+    useState<ThumbnailTemplate | null>(null);
   const { toast } = useToast();
 
-  const { data: templates, isLoading, refetch } = useQuery<ThumbnailTemplate[]>({
-    queryKey: ['/api/thumbnail-templates'],
+  const {
+    data: templates,
+    isLoading,
+    refetch,
+  } = useQuery<ThumbnailTemplate[]>({
+    queryKey: ["/api/thumbnail-templates"],
   });
 
   const form = useForm<InsertThumbnailTemplate>({
@@ -61,15 +76,17 @@ export default function Thumbnails() {
 
   const mutation = useMutation({
     mutationFn: async (data: InsertThumbnailTemplate) => {
-      const url = editingTemplate ? `/api/thumbnail-templates/${editingTemplate.id}` : '/api/thumbnail-templates';
-      const method = editingTemplate ? 'PUT' : 'POST';
+      const url = editingTemplate
+        ? `/api/thumbnail-templates/${editingTemplate.id}`
+        : "/api/thumbnail-templates";
+      const method = editingTemplate ? "PUT" : "POST";
       return await apiRequest(method, url, data);
     },
     onSuccess: () => {
       toast({
         title: editingTemplate ? "Template updated" : "Template created",
-        description: editingTemplate 
-          ? "Your thumbnail template has been successfully updated" 
+        description: editingTemplate
+          ? "Your thumbnail template has been successfully updated"
           : "Your thumbnail template has been successfully created",
       });
       form.reset();
@@ -79,7 +96,9 @@ export default function Thumbnails() {
     },
     onError: (error: any) => {
       toast({
-        title: editingTemplate ? "Failed to update template" : "Failed to create template",
+        title: editingTemplate
+          ? "Failed to update template"
+          : "Failed to create template",
         description: error.message,
         variant: "destructive",
       });
@@ -88,7 +107,7 @@ export default function Thumbnails() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest('DELETE', `/api/thumbnail-templates/${id}`);
+      return await apiRequest("DELETE", `/api/thumbnail-templates/${id}`);
     },
     onSuccess: () => {
       toast({
@@ -134,14 +153,30 @@ export default function Thumbnails() {
 
   const getTypeBadge = (type: string) => {
     switch (type) {
-      case 'ai-generated':
-        return <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">AI Generated</Badge>;
-      case 'first-image':
-        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">First Image</Badge>;
-      case 'last-image':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Last Image</Badge>;
-      case 'random-image':
-        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Random Image</Badge>;
+      case "ai-generated":
+        return (
+          <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+            AI Generated
+          </Badge>
+        );
+      case "first-image":
+        return (
+          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+            First Image
+          </Badge>
+        );
+      case "last-image":
+        return (
+          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+            Last Image
+          </Badge>
+        );
+      case "random-image":
+        return (
+          <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+            Random Image
+          </Badge>
+        );
       default:
         return <Badge variant="secondary">{type}</Badge>;
     }
@@ -199,7 +234,10 @@ export default function Thumbnails() {
           <CardContent className="p-0">
             {!templates || templates.length === 0 ? (
               <div className="text-center py-8 px-6">
-                <p className="text-muted-foreground mb-4">No thumbnail templates found. Create your first template to get started.</p>
+                <p className="text-muted-foreground mb-4">
+                  No thumbnail templates found. Create your first template to
+                  get started.
+                </p>
                 <Button onClick={handleAddTemplate}>
                   <Plus className="w-4 h-4 mr-2" />
                   Create Thumbnail Template
@@ -223,7 +261,9 @@ export default function Thumbnails() {
                       <TableRow key={template.id} className="hover:bg-muted/50">
                         <TableCell>
                           <div>
-                            <div className="font-medium text-foreground">{template.name}</div>
+                            <div className="font-medium text-foreground">
+                              {template.name}
+                            </div>
                             {template.prompt && (
                               <div className="text-sm text-muted-foreground truncate max-w-xs">
                                 {template.prompt.substring(0, 50)}...
@@ -232,13 +272,13 @@ export default function Thumbnails() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {getTypeBadge(template.type || 'ai-generated')}
+                          {getTypeBadge(template.type || "ai-generated")}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {template.model || 'gpt-4o'}
+                          {template.model || "gpt-4o"}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {template.fallbackStrategy || 'first-image'}
+                          {template.fallbackStrategy || "first-image"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(template.createdAt).toLocaleDateString()}
@@ -288,7 +328,9 @@ export default function Thumbnails() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {editingTemplate ? "Edit Thumbnail Template" : "Create Thumbnail Template"}
+              {editingTemplate
+                ? "Edit Thumbnail Template"
+                : "Create Thumbnail Template"}
             </DialogTitle>
             <DialogDescription>
               Configure how thumbnails should be generated for your videos
@@ -304,30 +346,40 @@ export default function Thumbnails() {
                   <FormItem>
                     <FormLabel>Template Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Ghost Stories Thumbnails" {...field} />
+                      <Input
+                        placeholder="e.g., Ghost Stories Thumbnails"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="type"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Thumbnail Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value ?? undefined}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="ai-generated">AI Generated</SelectItem>
+                        <SelectItem value="ai-generated">
+                          AI Generated
+                        </SelectItem>
                         <SelectItem value="first-image">First Image</SelectItem>
                         <SelectItem value="last-image">Last Image</SelectItem>
-                        <SelectItem value="random-image">Random Image</SelectItem>
+                        <SelectItem value="random-image">
+                          Random Image
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -335,7 +387,7 @@ export default function Thumbnails() {
                 )}
               />
 
-              {form.watch('type') === 'ai-generated' && (
+              {form.watch("type") === "ai-generated" && (
                 <>
                   <FormField
                     control={form.control}
@@ -344,10 +396,11 @@ export default function Thumbnails() {
                       <FormItem>
                         <FormLabel>Generation Prompt</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            placeholder="Create a compelling thumbnail for this story that will grab viewers' attention. Include dramatic elements, clear text overlay, and emotional expressions..." 
-                            rows={4} 
-                            {...field} 
+                          <Textarea
+                            placeholder="Create a compelling thumbnail for this story that will grab viewers' attention. Include dramatic elements, clear text overlay, and emotional expressions..."
+                            rows={4}
+                            {...field}
+                            value={field.value ?? undefined}
                           />
                         </FormControl>
                         <FormMessage />
@@ -362,7 +415,10 @@ export default function Thumbnails() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Primary Model</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value ?? undefined}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue />
@@ -371,7 +427,9 @@ export default function Thumbnails() {
                             <SelectContent>
                               <SelectItem value="gpt-4o">GPT-4o</SelectItem>
                               <SelectItem value="flux-pro">Flux Pro</SelectItem>
-                              <SelectItem value="flux-schnell">Flux Schnell</SelectItem>
+                              <SelectItem value="flux-schnell">
+                                Flux Schnell
+                              </SelectItem>
                               <SelectItem value="dalle-3">DALL-E 3</SelectItem>
                             </SelectContent>
                           </Select>
@@ -379,21 +437,26 @@ export default function Thumbnails() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="fallbackModel"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Fallback Model</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value ?? undefined}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="flux-schnell">Flux Schnell</SelectItem>
+                              <SelectItem value="flux-schnell">
+                                Flux Schnell
+                              </SelectItem>
                               <SelectItem value="dalle-3">DALL-E 3</SelectItem>
                               <SelectItem value="gpt-4o">GPT-4o</SelectItem>
                               <SelectItem value="none">None</SelectItem>
@@ -413,16 +476,25 @@ export default function Thumbnails() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Fallback Strategy</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value ?? undefined}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="first-image">First Image from Video</SelectItem>
-                        <SelectItem value="last-image">Last Image from Video</SelectItem>
-                        <SelectItem value="random-image">Random Image from Video</SelectItem>
+                        <SelectItem value="first-image">
+                          First Image from Video
+                        </SelectItem>
+                        <SelectItem value="last-image">
+                          Last Image from Video
+                        </SelectItem>
+                        <SelectItem value="random-image">
+                          Random Image from Video
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -431,11 +503,19 @@ export default function Thumbnails() {
               />
 
               <div className="flex items-center justify-end space-x-3 pt-4 border-t border-border">
-                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsFormOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button type="submit" disabled={mutation.isPending}>
-                  {mutation.isPending ? "Saving..." : editingTemplate ? "Update Template" : "Create Template"}
+                  {mutation.isPending
+                    ? "Saving..."
+                    : editingTemplate
+                    ? "Update Template"
+                    : "Create Template"}
                 </Button>
               </div>
             </form>

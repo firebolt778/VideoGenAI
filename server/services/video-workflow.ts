@@ -188,7 +188,7 @@ export class VideoWorkflowService {
     const prompt = ShortcodeProcessor.process(template.hookPrompt!, context);
     
     // Use OpenAI to generate hook
-    const response = await openaiService.generateFullScript({ title: context.title, chapters: [], summary: "" }, prompt);
+    const response = await openaiService.generateFullScript({ title: context.title || "", chapters: [], summary: "" }, prompt);
     return response;
   }
 

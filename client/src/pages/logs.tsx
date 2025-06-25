@@ -274,7 +274,7 @@ export default function Logs() {
                           <div className="truncate" title={log.message}>
                             {log.message}
                           </div>
-                          {log.details && (
+                          {!!log.details && (
                             <details className="mt-1">
                               <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
                                 View details
@@ -289,7 +289,7 @@ export default function Logs() {
                           {log.entityId || '-'}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {formatTime(log.createdAt)}
+                          {formatTime(log.createdAt.toString())}
                         </TableCell>
                       </TableRow>
                     ))}

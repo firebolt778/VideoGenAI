@@ -56,9 +56,9 @@ export class ShortcodeProcessor {
 
   static extractChapters(response: string): Array<{ name: string; description: string }> {
     const chapters: Array<{ name: string; description: string }> = [];
-    const chapterMatches = response.matchAll(/Chapter \d+:\s*(.+?)\s*-\s*(.+?)(?:\n|$)/gi);
-    
-    for (const match of chapterMatches) {
+    const chapterRegex = /Chapter \d+:\s*(.+?)\s*-\s*(.+?)(?:\n|$)/gi;
+    let match: RegExpExecArray | null;
+    while ((match = chapterRegex.exec(response)) !== null) {
       chapters.push({
         name: match[1].trim(),
         description: match[2].trim()
@@ -87,9 +87,9 @@ export class ShortcodeProcessor {
     }> = [];
 
     // Match patterns like: Image 1: [script segment] - [description] - filename: image_001.jpg
-    const matches = response.matchAll(/Image (\d+):\s*(.+?)\s*-\s*(.+?)\s*-\s*filename:\s*(.+?)(?:\n|$)/gi);
-    
-    for (const match of matches) {
+    const regex = /Image (\d+):\s*(.+?)\s*-\s*(.+?)\s*-\s*filename:\s*(.+?)(?:\n|$)/gi;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(response)) !== null) {
       assignments.push({
         imageIndex: parseInt(match[1]),
         scriptSegment: match[2].trim(),

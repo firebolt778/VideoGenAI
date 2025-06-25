@@ -61,7 +61,7 @@ export default function Channels() {
             </DialogTitle>
           </DialogHeader>
           <EnhancedChannelForm
-            channelId={editingChannel?.id}
+            channel={editingChannel}
             onSuccess={handleFormClose}
           />
         </DialogContent>

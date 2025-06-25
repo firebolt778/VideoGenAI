@@ -3,83 +3,118 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { insertChannelSchema, type InsertChannel, type VideoTemplate, type ThumbnailTemplate } from "@shared/schema";
+import {
+  insertChannelSchema,
+  type InsertChannel,
+  type VideoTemplate,
+  type ThumbnailTemplate,
+  Channel,
+} from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, Settings, Video, Image, Calendar, Youtube } from "lucide-react";
+import { Upload, Settings, Video, Image, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface EnhancedChannelFormProps {
-  channelId?: number;
+  channel: Channel | null;
   onSuccess?: () => void;
 }
 
-export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedChannelFormProps) {
+export default function EnhancedChannelForm({
+  channel,
+  onSuccess,
+}: EnhancedChannelFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingWatermark, setUploadingWatermark] = useState(false);
+  const isEditing = !!channel;
 
   const { data: videoTemplates } = useQuery<VideoTemplate[]>({
-    queryKey: ['/api/video-templates'],
+    queryKey: ["/api/video-templates"],
   });
 
   const { data: thumbnailTemplates } = useQuery<ThumbnailTemplate[]>({
-    queryKey: ['/api/thumbnail-templates'],
+    queryKey: ["/api/thumbnail-templates"],
   });
 
   const form = useForm<InsertChannel>({
     resolver: zodResolver(insertChannelSchema),
     defaultValues: {
-      name: "",
-      url: "",
-      description: "",
-      watermarkPosition: "bottom-right",
-      watermarkOpacity: 80,
-      watermarkSize: 15,
-      schedule: "daily",
-      videosMin: 1,
-      videosMax: 2,
-      chapterIndicators: false,
-      videoIntro: false,
-      videoOutro: false,
-      isActive: true,
+      name: channel?.name ?? "",
+      url: channel?.url ?? "",
+      description: channel?.description ?? "",
+      watermarkPosition: channel?.watermarkPosition ?? "bottom-right",
+      watermarkOpacity: channel?.watermarkOpacity ?? 80,
+      watermarkSize: channel?.watermarkSize ?? 15,
+      schedule: channel?.schedule ?? "daily",
+      videosMin: channel?.videosMin ?? 1,
+      videosMax: channel?.videosMax ?? 2,
+      chapterIndicators: channel?.chapterIndicators ?? false,
+      videoIntro: channel?.videoIntro ?? false,
+      videoOutro: channel?.videoOutro ?? false,
+      isActive: channel?.isActive ?? true,
     },
   });
 
   const createChannelMutation = useMutation({
     mutationFn: async (data: InsertChannel) => {
-      return apiRequest("POST", "/api/channels", data);
+      const method = isEditing ? "PUT" : "POST";
+      const url = isEditing ? `/api/channels/${channel.id}` : "/api/channels";
+      return apiRequest(method, url, data);
     },
     onSuccess: () => {
-      toast({ title: "Channel created successfully" });
-      queryClient.invalidateQueries({ queryKey: ['/api/channels'] });
+      toast({
+        title: `Channel ${isEditing ? "updated" : "created"} successfully`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/channels"] });
       onSuccess?.();
     },
     onError: () => {
-      toast({ title: "Failed to create channel", variant: "destructive" });
+      toast({
+        title: `Failed to ${isEditing ? "update" : "create"} channel`,
+        variant: "destructive",
+      });
     },
   });
 
   const handleLogoUpload = async (file: File) => {
     setUploadingLogo(true);
     const formData = new FormData();
-    formData.append('file', file);
-    
+    formData.append("file", file);
+
     try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
+      const response = await fetch("/api/upload", {
+        method: "POST",
         body: formData,
       });
       const result = await response.json();
-      form.setValue('logoUrl', result.url);
+      form.setValue("logoUrl", result.url);
       toast({ title: "Logo uploaded successfully" });
     } catch (error) {
       toast({ title: "Failed to upload logo", variant: "destructive" });
@@ -91,15 +126,15 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
   const handleWatermarkUpload = async (file: File) => {
     setUploadingWatermark(true);
     const formData = new FormData();
-    formData.append('file', file);
-    
+    formData.append("file", file);
+
     try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
+      const response = await fetch("/api/upload", {
+        method: "POST",
         body: formData,
       });
       const result = await response.json();
-      form.setValue('watermarkUrl', result.url);
+      form.setValue("watermarkUrl", result.url);
       toast({ title: "Watermark uploaded successfully" });
     } catch (error) {
       toast({ title: "Failed to upload watermark", variant: "destructive" });
@@ -149,7 +184,11 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                   <FormItem>
                     <FormLabel>YouTube Channel URL</FormLabel>
                     <FormControl>
-                      <Input placeholder="https://youtube.com/@channel" {...field} />
+                      <Input
+                        placeholder="https://youtube.com/@channel"
+                        {...field}
+                        value={field.value ?? undefined}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -163,10 +202,11 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                   <FormItem>
                     <FormLabel>Channel Description</FormLabel>
                     <FormControl>
-                      <Textarea 
+                      <Textarea
                         placeholder="Enter channel description for branding and video descriptions"
                         className="min-h-[100px]"
-                        {...field} 
+                        {...field}
+                        value={field.value ?? undefined}
                       />
                     </FormControl>
                     <FormMessage />
@@ -211,9 +251,13 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                     </label>
                   </div>
                 </div>
-                {form.watch('logoUrl') && (
+                {form.watch("logoUrl") && (
                   <div className="mt-2">
-                    <img src={form.watch('logoUrl')} alt="Logo preview" className="h-16 w-16 object-contain" />
+                    <img
+                      src={form.watch("logoUrl") ?? undefined}
+                      alt="Logo preview"
+                      className="h-16 w-16 object-contain"
+                    />
                   </div>
                 )}
               </div>
@@ -224,7 +268,10 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                   <Upload className="mx-auto h-12 w-12 text-gray-400" />
                   <div className="mt-4">
-                    <label htmlFor="watermark-upload" className="cursor-pointer">
+                    <label
+                      htmlFor="watermark-upload"
+                      className="cursor-pointer"
+                    >
                       <span className="mt-2 block text-sm font-medium text-gray-900">
                         Upload watermark image for videos
                       </span>
@@ -242,7 +289,7 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                   </div>
                 </div>
 
-                {form.watch('watermarkUrl') && (
+                {form.watch("watermarkUrl") && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <FormField
@@ -251,17 +298,28 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Position</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value ?? undefined}
+                            >
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select position" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="top-left">Top Left</SelectItem>
-                                <SelectItem value="top-right">Top Right</SelectItem>
-                                <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                                <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                                <SelectItem value="top-left">
+                                  Top Left
+                                </SelectItem>
+                                <SelectItem value="top-right">
+                                  Top Right
+                                </SelectItem>
+                                <SelectItem value="bottom-left">
+                                  Bottom Left
+                                </SelectItem>
+                                <SelectItem value="bottom-right">
+                                  Bottom Right
+                                </SelectItem>
                                 <SelectItem value="center">Center</SelectItem>
                               </SelectContent>
                             </Select>
@@ -284,7 +342,9 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                                 max={100}
                                 step={5}
                                 value={[field.value || 80]}
-                                onValueChange={(value) => field.onChange(value[0])}
+                                onValueChange={(value) =>
+                                  field.onChange(value[0])
+                                }
                               />
                             </FormControl>
                             <FormMessage />
@@ -306,7 +366,9 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                                 max={50}
                                 step={1}
                                 value={[field.value || 15]}
-                                onValueChange={(value) => field.onChange(value[0])}
+                                onValueChange={(value) =>
+                                  field.onChange(value[0])
+                                }
                               />
                             </FormControl>
                             <FormMessage />
@@ -339,13 +401,18 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <FormLabel className="text-base">Chapter Indicators</FormLabel>
+                        <FormLabel className="text-base">
+                          Chapter Indicators
+                        </FormLabel>
                         <p className="text-sm text-muted-foreground">
                           Add fade and chapter screens between sections
                         </p>
                       </div>
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        <Switch
+                          checked={field.value ?? false}
+                          onCheckedChange={field.onChange}
+                        />
                       </FormControl>
                     </FormItem>
                   )}
@@ -363,7 +430,10 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                         </p>
                       </div>
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        <Switch
+                          checked={field.value ?? false}
+                          onCheckedChange={field.onChange}
+                        />
                       </FormControl>
                     </FormItem>
                   )}
@@ -381,7 +451,10 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                         </p>
                       </div>
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        <Switch
+                          checked={field.value ?? false}
+                          onCheckedChange={field.onChange}
+                        />
                       </FormControl>
                     </FormItem>
                   )}
@@ -395,14 +468,17 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                   <FormItem>
                     <FormLabel>Video Description Prompt *</FormLabel>
                     <FormControl>
-                      <Textarea 
+                      <Textarea
                         placeholder="Enter prompt to generate video descriptions. Use shortcodes like {{TITLE}}, {{SCRIPT}}, {{CHANNEL_NAME}} to include dynamic content."
                         className="min-h-[120px]"
-                        {...field} 
+                        {...field}
+                        value={field.value ?? undefined}
                       />
                     </FormControl>
                     <p className="text-sm text-muted-foreground">
-                      {"Available shortcodes: {{TITLE}}, {{SCRIPT}}, {{CHANNEL_NAME}}, {{CHANNEL_DESCRIPTION}}"}
+                      {
+                        "Available shortcodes: {{TITLE}}, {{SCRIPT}}, {{CHANNEL_NAME}}, {{CHANNEL_DESCRIPTION}}"
+                      }
                     </p>
                     <FormMessage />
                   </FormItem>
@@ -430,7 +506,10 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Schedule Period</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value ?? undefined}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select schedule" />
@@ -454,12 +533,15 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                     <FormItem>
                       <FormLabel>Minimum Videos</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          max="10" 
+                        <Input
+                          type="number"
+                          min="0"
+                          max="10"
                           {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value))}
+                          onChange={(e) =>
+                            field.onChange(parseInt(e.target.value))
+                          }
+                          value={field.value ?? undefined}
                         />
                       </FormControl>
                       <FormMessage />
@@ -474,12 +556,15 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                     <FormItem>
                       <FormLabel>Maximum Videos</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          min="1" 
-                          max="10" 
+                        <Input
+                          type="number"
+                          min="1"
+                          max="10"
                           {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value))}
+                          onChange={(e) =>
+                            field.onChange(parseInt(e.target.value))
+                          }
+                          value={field.value ?? undefined}
                         />
                       </FormControl>
                       <FormMessage />
@@ -505,13 +590,18 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
                 render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base">Active Channel</FormLabel>
+                      <FormLabel className="text-base">
+                        Active Channel
+                      </FormLabel>
                       <p className="text-sm text-muted-foreground">
                         Enable automatic video generation for this channel
                       </p>
                     </div>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      <Switch
+                        checked={field.value ?? false}
+                        onCheckedChange={field.onChange}
+                      />
                     </FormControl>
                   </FormItem>
                 )}
@@ -524,7 +614,13 @@ export default function EnhancedChannelForm({ channelId, onSuccess }: EnhancedCh
               Cancel
             </Button>
             <Button type="submit" disabled={createChannelMutation.isPending}>
-              {createChannelMutation.isPending ? "Creating..." : "Create Channel"}
+              {createChannelMutation.isPending
+                ? isEditing
+                  ? "Updating..."
+                  : "Creating..."
+                : isEditing
+                ? "Update Channel"
+                : "Create Channel"}
             </Button>
           </div>
         </form>

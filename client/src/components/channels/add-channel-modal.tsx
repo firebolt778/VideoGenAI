@@ -120,7 +120,7 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                     <FormItem>
                       <FormLabel>Channel Name *</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Ghost Stories Channel" {...field} />
+                        <Input placeholder="e.g., Ghost Stories Channel" {...field} value={String(field.value ?? "")} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -134,7 +134,7 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                     <FormItem>
                       <FormLabel>YouTube URL</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://youtube.com/@channel" {...field} />
+                        <Input placeholder="https://youtube.com/@channel" {...field} value={String(field.value ?? "")} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -153,6 +153,7 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                         placeholder="Brief description of your channel..." 
                         rows={3} 
                         {...field} 
+                        value={field.value === null || field.value === undefined ? '' : field.value} 
                       />
                     </FormControl>
                     <FormMessage />
@@ -180,8 +181,8 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                           endpoint="/api/upload/logo"
                           accept="image/*"
                           onUpload={(url) => field.onChange(url)}
-                          placeholder="Upload logo or drag and drop"
-                          description="PNG, JPG up to 2MB"
+                          placeholder="Upload a logo or drag and drop"
+                          description="PNG or JPG, up to 2MB"
                         />
                       </FormControl>
                       <FormMessage />
@@ -200,7 +201,7 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                           endpoint="/api/upload/watermark"
                           accept="image/*"
                           onUpload={(url) => field.onChange(url)}
-                          placeholder="Upload watermark or drag and drop"
+                          placeholder="Upload a watermark or drag and drop"
                           description="PNG with transparency"
                         />
                       </FormControl>
@@ -217,7 +218,7 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Watermark Position</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue />
@@ -279,7 +280,7 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Publishing Schedule</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue />
@@ -309,6 +310,8 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                             max={10}
                             {...field}
                             onChange={(e) => field.onChange(parseInt(e.target.value))}
+                            placeholder="Minimum"
+                            value={field.value === undefined || field.value === null ? "" : String(field.value)}
                           />
                         </FormControl>
                       )}
@@ -321,10 +324,12 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                         <FormControl>
                           <Input
                             type="number"
-                            min={1}
+                            min={0}
                             max={10}
                             {...field}
                             onChange={(e) => field.onChange(parseInt(e.target.value))}
+                            placeholder="Maximum"
+                            value={field.value === undefined || field.value === null ? "" : String(field.value)}
                           />
                         </FormControl>
                       )}
@@ -378,7 +383,7 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                       <FormLabel>Chapter Indicators</FormLabel>
                       <FormControl>
                         <Switch
-                          checked={field.value}
+                          checked={field.value ?? false}
                           onCheckedChange={field.onChange}
                         />
                       </FormControl>
@@ -394,7 +399,7 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                       <FormLabel>Video Intro</FormLabel>
                       <FormControl>
                         <Switch
-                          checked={field.value}
+                          checked={field.value ?? false}
                           onCheckedChange={field.onChange}
                         />
                       </FormControl>
@@ -410,7 +415,7 @@ export default function AddChannelModal({ isOpen, onClose }: AddChannelModalProp
                       <FormLabel>Video Outro</FormLabel>
                       <FormControl>
                         <Switch
-                          checked={field.value}
+                          checked={field.value ?? false}
                           onCheckedChange={field.onChange}
                         />
                       </FormControl>

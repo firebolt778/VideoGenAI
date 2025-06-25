@@ -67,10 +67,7 @@ export default function EnhancedThumbnailForm({ thumbnailId, onSuccess }: Enhanc
 
   const createTemplateMutation = useMutation({
     mutationFn: async (data: InsertThumbnailTemplate) => {
-      return apiRequest("/api/thumbnail-templates", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/thumbnail-templates", data);
     },
     onSuccess: () => {
       toast({ title: "Thumbnail template created successfully" });
@@ -112,7 +109,7 @@ export default function EnhancedThumbnailForm({ thumbnailId, onSuccess }: Enhanc
                   <FormItem>
                     <FormLabel>Template Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Ghost Stories Thumbnail, Horror Style, etc." {...field} />
+                      <Input placeholder="e.g., Ghost Stories Thumbnail, Horror Style, etc." {...field} value={String(field.value ?? '')} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -125,7 +122,7 @@ export default function EnhancedThumbnailForm({ thumbnailId, onSuccess }: Enhanc
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Thumbnail Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={String(field.value ?? '')}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select thumbnail type" />
@@ -205,7 +202,8 @@ Generate a dramatic, eye-catching thumbnail with:
 
 Style: Dark, atmospheric, professional thumbnail design"
                             className="min-h-[200px]"
-                            {...field} 
+                            {...field}
+                            value={String(field.value ?? '')}
                           />
                         </FormControl>
                         <p className="text-sm text-muted-foreground">
@@ -223,7 +221,7 @@ Style: Dark, atmospheric, professional thumbnail design"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Primary Image Model</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} defaultValue={String(field.value ?? '')}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select model" />
@@ -247,7 +245,7 @@ Style: Dark, atmospheric, professional thumbnail design"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Fallback Model</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} defaultValue={String(field.value ?? '')}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select fallback model" />
@@ -274,7 +272,7 @@ Style: Dark, atmospheric, professional thumbnail design"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Fallback Strategy (if AI generation fails)</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} defaultValue={String(field.value ?? '')}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select fallback strategy" />

@@ -76,11 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/channels", async (req, res) => {
     try {
       const validatedData = insertChannelSchema.parse(req.body);
-      console.log('--------------------------');
-      console.log(validatedData);
       const channel = await storage.createChannel(validatedData);
-      console.log('-------------------------')
-      console.log(channel)
       
       // Log channel creation
       await storage.createJobLog({
@@ -315,11 +311,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!channel) {
         return res.status(404).json({ message: "Channel not found" });
       }
-      
+
+      const templates = await storage.getVideoTemplates();
+      if (!templates.length) {
+        return res.status(404).json({ message: "Templates not found" });
+      }
+
       // Create test video entry
       const testVideo = await storage.createVideo({
         channelId,
-        templateId: 1, // Default to first template for now
+        templateId: templates[0].id, // Default to first template for now
         title: "Test Video - " + new Date().toISOString(),
         description: "Test video generated locally",
         status: "generating"
@@ -335,7 +336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ message: "Test video generation started", videoId: testVideo.id });
     } catch (error) {
-      res.status(500).json({ message: "Failed to create test video" });
+      res.status(500).json({ message: `Failed to create test video: ${(error as Error).message}` });
     }
   });
 

@@ -170,14 +170,14 @@ export default function VideoTemplates() {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button
+                            {/* <Button
                               variant="ghost"
                               size="sm"
                               className="h-8 w-8 p-0"
                               title="Duplicate Template"
                             >
                               <Copy className="h-4 w-4" />
-                            </Button>
+                            </Button> */}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -206,7 +206,7 @@ export default function VideoTemplates() {
             </DialogTitle>
           </DialogHeader>
           <EnhancedStoryTemplateForm
-            templateId={editingTemplate?.id}
+            template={editingTemplate}
             onSuccess={handleFormClose}
           />
         </DialogContent>
