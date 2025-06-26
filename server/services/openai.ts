@@ -1,8 +1,8 @@
 import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key" 
+export const openai = new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key"
 });
 
 export interface StoryOutline {
@@ -29,12 +29,12 @@ export interface ImageAssignment {
 
 export class OpenAIService {
   async generateStoryOutline(idea: string, customPrompt?: string): Promise<StoryOutline> {
-    const prompt = customPrompt || `
+    let prompt = customPrompt || `
 Create a compelling story outline for a YouTube video based on this idea: "${idea}"
 
 The story should be engaging, mysterious, and suitable for a 10-15 minute video.
-Include 3-5 chapters with descriptive names.
-
+Include 3-5 chapters with descriptive names.`
+    prompt += `
 Respond with JSON in this exact format:
 {
   "title": "Video title",
@@ -122,7 +122,10 @@ Enclose the script content between --- markers like this:
     const prompt = customPrompt || `
 Analyze this script and generate ${numImages} detailed image prompts that would visually represent key scenes:
 
-Script: "${script}"
+Script:
+\`\`\`
+${script}
+\`\`\`
 
 For each image, create a detailed description that includes:
 - Main subject/scene
@@ -147,7 +150,7 @@ Respond with JSON in this exact format:
         messages: [
           {
             role: "system",
-            content: "You are an expert visual director who creates detailed image prompts for AI art generation."
+            content: "You are an expert visual director who creates detailed image prompts for AI art generation. Always respond with valid JSON."
           },
           {
             role: "user",
@@ -158,26 +161,29 @@ Respond with JSON in this exact format:
         temperature: 0.7
       });
 
+      console.log('============================')
+      console.log(response.choices[0].message.content)
+
       const result = JSON.parse(response.choices[0].message.content || "{}");
-      return result.images || [];
+      return result.images || result.prompts || result.image_prompts || [];
     } catch (error) {
       throw new Error(`Failed to generate image prompts: ${(error as Error).message}`);
     }
   }
 
   async assignImagesToScript(script: string, imageDescriptions: string[], customPrompt?: string): Promise<ImageAssignment[]> {
-    const prompt = customPrompt || `
+    let prompt = customPrompt || `
 Match these image descriptions to specific segments of the script for optimal visual storytelling:
 
 Script: "${script}"
 
 Available images:
-${imageDescriptions.map((desc, i) => `${i + 1}. ${desc}`).join('\n')}
+${imageDescriptions.map((desc, i) => `${i + 1}. ${desc}`).join('\n')}`;
+    prompt += `
 
 For each image, determine:
 - Which script segment it should accompany
 - Why this pairing works best
-
 Respond with JSON in this exact format:
 {
   "assignments": [
@@ -196,7 +202,7 @@ Respond with JSON in this exact format:
         messages: [
           {
             role: "system",
-            content: "You are an expert video editor who understands visual storytelling and pacing."
+            content: "You are an expert video editor who understands visual storytelling and pacing. Always respond with valid JSON."
           },
           {
             role: "user",

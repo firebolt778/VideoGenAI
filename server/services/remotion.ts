@@ -69,13 +69,12 @@ export class RemotionService {
         throw new Error('Failed to create bundle');
       }
 
-      const compositions = await selectComposition({
+      const composition = await selectComposition({
         serveUrl: this.bundlePath,
         id: 'StoryVideo',
         inputProps: config,
       });
 
-      const composition = compositions[0];
       if (!composition) {
         throw new Error('No composition found');
       }
@@ -87,7 +86,7 @@ export class RemotionService {
       await renderMedia({
         composition: {
           ...composition,
-          durationInFrames,
+          durationInFrames: durationInFrames || 1,
         },
         serveUrl: this.bundlePath,
         codec: 'h264',
@@ -103,8 +102,18 @@ export class RemotionService {
   }
 
   private async createComposition(compositionsDir: string): Promise<void> {
-    // Create index.ts
+    // Create index.tsx
     const indexContent = `
+import { registerRoot } from 'remotion';
+import { RemotionVideo } from './Root';
+
+registerRoot(RemotionVideo);
+`;
+
+    await fs.writeFile(path.join(compositionsDir, 'index.ts'), indexContent);
+
+    // Create index.tsx
+    const rootContent = `
 import { Composition } from 'remotion';
 import { StoryVideo } from './StoryVideo';
 
@@ -124,7 +133,7 @@ export const RemotionVideo: React.FC = () => {
 };
 `;
 
-    await fs.writeFile(path.join(compositionsDir, 'index.ts'), indexContent);
+    await fs.writeFile(path.join(compositionsDir, 'Root.tsx'), rootContent);
 
     // Create StoryVideo component
     const storyVideoContent = `

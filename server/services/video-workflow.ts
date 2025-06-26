@@ -18,10 +18,9 @@ export interface VideoGenerationProgress {
 export class VideoWorkflowService {
   private progressCallbacks: Map<number, (progress: VideoGenerationProgress) => void> = new Map();
 
-  async generateVideo(channelId: number, templateId: number, testMode: boolean = false): Promise<Video> {
+  async generateVideo(channelId: number, template: VideoTemplate, testMode: boolean = false): Promise<Video> {
     const channel = await storage.getChannel(channelId);
-    const template = await storage.getVideoTemplate(templateId);
-    
+  
     if (!channel || !template) {
       throw new Error("Channel or template not found");
     }
@@ -29,7 +28,7 @@ export class VideoWorkflowService {
     // Create video record
     const video = await storage.createVideo({
       channelId,
-      templateId,
+      templateId: template.id,
       title: "Generating...",
       status: "generating",
     });
@@ -123,7 +122,12 @@ export class VideoWorkflowService {
         entityId: video.id,
         status: "error",
         message: `Video generation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-        details: { channelId, templateId, testMode, error: error instanceof Error ? error.stack : error }
+        details: {
+          channelId,
+          templateId: template.id,
+          testMode,
+          error: error instanceof Error ? error.stack : error
+        }
       });
 
       throw error;
@@ -244,7 +248,7 @@ export class VideoWorkflowService {
     
     for (let i = 0; i < imageAssignments.length; i++) {
       const assignment = imageAssignments[i];
-      const voiceId = this.selectVoice(template.audioVoices || []);
+      const voiceId = await this.selectVoice(template.audioVoices || []);
       
       try {
         const segment = await elevenLabsService.generateAudio(
@@ -267,9 +271,10 @@ export class VideoWorkflowService {
     return audioSegments;
   }
 
-  private selectVoice(voices: string[]): string {
+  private async selectVoice(voices: string[]): Promise<string> {
     if (voices.length === 0) {
-      return "rachel"; // Default voice
+      const voices = await elevenLabsService.getAvailableVoices();
+      return voices[0].voice_id;
     }
     
     const randomIndex = Math.floor(Math.random() * voices.length);

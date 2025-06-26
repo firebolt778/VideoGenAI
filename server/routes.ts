@@ -401,7 +401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { videoWorkflowService } = await import("./services/video-workflow");
       
       // Start generation in background
-      const video = await videoWorkflowService.generateVideo(channelId, templateId, testMode);
+      const video = await videoWorkflowService.generateVideo(channelId, template, testMode);
 
       res.json({
         success: true,

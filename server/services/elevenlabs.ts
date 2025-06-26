@@ -13,12 +13,16 @@ export interface AudioSegment {
 export class ElevenLabsService {
   private apiKey: string;
   private baseUrl = "https://api.elevenlabs.io/v1";
+  private availableVoices: ElevenLabsVoice[] = [];
 
   constructor() {
     this.apiKey = process.env.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY_ENV_VAR || "default_key";
   }
 
   async getAvailableVoices(): Promise<ElevenLabsVoice[]> {
+    if (this.availableVoices.length) {
+      return this.availableVoices;
+    }
     try {
       const response = await fetch(`${this.baseUrl}/voices`, {
         headers: {
@@ -31,7 +35,9 @@ export class ElevenLabsService {
       }
 
       const data = await response.json();
-      return data.voices || [];
+      const voices = data.voices || [];
+      this.availableVoices = voices;
+      return voices;
     } catch (error) {
       throw new Error(`Failed to fetch voices: ${(error as Error).message}`);
     }
@@ -48,7 +54,7 @@ export class ElevenLabsService {
         },
         body: JSON.stringify({
           text: text,
-          model_id: "eleven_monolingual_v1",
+          model_id: "eleven_multilingual_v2",
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.5,

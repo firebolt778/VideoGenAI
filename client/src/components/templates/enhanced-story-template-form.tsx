@@ -336,7 +336,7 @@ export default function EnhancedStoryTemplateForm({
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Story Outline Generation *</CardTitle>
+                  <CardTitle>Story Outline Generation</CardTitle>
                   <CardDescription>
                     Create story outlines with title and chapter structure
                   </CardDescription>
@@ -350,7 +350,7 @@ export default function EnhancedStoryTemplateForm({
                         <FormLabel>Story Outline Prompt</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Create a story outline for: {{IDEAS}}&#10;&#10;Format the response as:&#10;Title: [Video Title]&#10;Chapter 1: [Chapter Name] - [Description]&#10;Chapter 2: [Chapter Name] - [Description]&#10;Summary: [Brief summary]"
+                            placeholder="Create a story outline for: {{IDEAS}}"
                             className="min-h-[120px]"
                             {...field}
                             value={field.value ?? undefined}

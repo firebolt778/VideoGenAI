@@ -1,3 +1,5 @@
+import { openai } from "./openai";
+
 export interface FluxImageOptions {
   prompt: string;
   width?: number;
@@ -32,7 +34,7 @@ export class FluxService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          version: "black-forest-labs/flux-schnell:bf2f84e4d70f4e3f0cfc2f03ead2b1e7a1b0b6b0b5e0d3b0a0f0e0d0c0b0a090",
+          version: "black-forest-labs/flux-schnell",
           input: {
             prompt: options.prompt,
             width: options.width || 1024,
@@ -157,14 +159,8 @@ export class FluxService {
       return await this.generateImage({ prompt });
     } catch (fluxError) {
       console.log('Flux generation failed, falling back to DALL-E 3:', (fluxError as Error).message);
-      
-      try {
-        // Import OpenAI service for fallback
-        const OpenAI = (await import('openai')).default;
-        const openai = new OpenAI({ 
-          apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key"
-        });
 
+      try {
         const response = await openai.images.generate({
           model: "dall-e-3",
           prompt: prompt,
