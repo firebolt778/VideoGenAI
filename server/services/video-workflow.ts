@@ -1,7 +1,7 @@
 import { openaiService } from "./openai";
 import { elevenLabsService } from "./elevenlabs";
 import { fluxService } from "./flux";
-import { remotionService } from "./remotion";
+import { remotionService, RemotionVideoConfig } from "./remotion";
 import { youtubeService } from "./youtube";
 import { ShortcodeProcessor, type ShortcodeContext } from "./shortcode";
 import { storage } from "../storage";
@@ -288,7 +288,7 @@ export class VideoWorkflowService {
     images: any[],
     template: VideoTemplate,
     channel: Channel
-  ) {
+  ): RemotionVideoConfig {
     return {
       title,
       script,
@@ -311,13 +311,13 @@ export class VideoWorkflowService {
         filmGrain: false,
         fog: false
       },
-      captions: template.captionsEnabled ? {
-        enabled: true,
+      captions: {
+        enabled: !!template.captionsEnabled,
         font: template.captionsFont || "Inter",
         color: template.captionsColor || "#ffffff",
         position: template.captionsPosition || "bottom",
         wordsPerTime: template.captionsWordsPerTime || 3
-      } : { enabled: false }
+      }
     };
   }
 

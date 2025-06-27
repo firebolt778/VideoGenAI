@@ -78,6 +78,15 @@ export class ElevenLabsService {
       await fs.mkdir(audioDir, { recursive: true });
       
       const filepath = path.join(audioDir, filename);
+      // If file exists, delete it before writing new audio
+      try {
+        await fs.unlink(filepath);
+      } catch (err: any) {
+        // Ignore error if file does not exist
+        if (err.code !== 'ENOENT') {
+          throw err;
+        }
+      }
       await fs.writeFile(filepath, Buffer.from(audioBuffer));
 
       return {

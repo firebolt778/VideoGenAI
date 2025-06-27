@@ -69,6 +69,20 @@ export class RemotionService {
         throw new Error('Failed to create bundle');
       }
 
+      const assetBaseUrl = process.env.ASSET_BASE_URL || "http://127.0.0.1:5000";
+      const len = config.images.length;
+      for (let i = 0; i < len; i++) {
+        config.images[i].filename =
+          `${assetBaseUrl}uploads/images/${config.images[i].filename}`;
+        config.audioSegments[i].filename =
+          `${assetBaseUrl}uploads/audio/${config.audioSegments[i].filename}`;
+      }
+      if (config.watermark) {
+        config.watermark.url = config.watermark.url.startsWith('http')
+          ? config.watermark.url
+          : `${assetBaseUrl}${config.watermark.url}`;
+      }
+
       const composition = await selectComposition({
         serveUrl: this.bundlePath,
         id: 'StoryVideo',
@@ -200,6 +214,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   }
 
   const currentImage = images[currentImageIndex];
+  const segment = audioSegments[currentImageIndex];
 
   // Ken Burns effect calculation
   const kenBurnsScale = effects?.kenBurns 
@@ -211,7 +226,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
       {/* Background Image */}
       {currentImage && (
         <Img
-          src={'/uploads/images/' + currentImage.filename}
+          src={currentImage.filename}
           style={{
             width: '100%',
             height: '100%',
@@ -226,9 +241,8 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
       {audioSegments.map((segment, index) => (
         <Audio
           key={index}
-          src={'/uploads/audio/' + segment.filename}
-          startFrom={(audioSegments.slice(0, index).reduce((sum, s) => sum + s.duration, 0) / 1000) * fps}
-          endAt={((audioSegments.slice(0, index + 1).reduce((sum, s) => sum + s.duration, 0) / 1000) * fps)}
+          src={segment.filename}
+          delayRenderTimeoutInMilliseconds={segment.duration}
         />
       ))}
 
@@ -266,7 +280,8 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
           }}
         >
           {/* Simple caption display - in production, this would be more sophisticated */}
-          {script.substring(0, 100)}...
+          {/* {script.substring(0, 100)}... */}
+          {segment?.text || ""}
         </div>
       )}
     </AbsoluteFill>
