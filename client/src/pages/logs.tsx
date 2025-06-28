@@ -12,7 +12,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { AlertCircle, CheckCircle, Info, AlertTriangle, Filter, Download } from "lucide-react";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -295,6 +295,7 @@ export default function Logs() {
                     ))}
                   </TableBody>
                 </Table>
+                <ScrollBar orientation="horizontal" />
               </ScrollArea>
             )}
           </CardContent>

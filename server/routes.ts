@@ -126,15 +126,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Channel not found" });
       }
       
+      // Get related data counts for logging
+      const channelVideos = await storage.getVideos(id);
+      const videoCount = channelVideos.length;
+      
       const deleted = await storage.deleteChannel(id);
       
       if (deleted) {
-        // Log channel deletion
+        // Log channel deletion with details about what was deleted
         await storage.createJobLog({
           type: 'channel',
           entityId: id,
           status: 'success',
-          message: `Channel "${channel.name}" deleted successfully`
+          message: `Channel "${channel.name}" and ${videoCount} associated videos deleted successfully`,
+          details: {
+            channelName: channel.name,
+            videosDeleted: videoCount,
+            channelId: id
+          }
         });
         
         res.status(204).send();
@@ -142,8 +151,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ message: "Failed to delete channel" });
       }
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Failed to delete channel" });
+      console.error('Channel deletion error:', error);
+      res.status(500).json({ 
+        message: "Failed to delete channel and related data",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

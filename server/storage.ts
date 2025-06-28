@@ -60,11 +60,13 @@ export interface IStorage {
   createVideo(video: InsertVideo): Promise<Video>;
   updateVideo(id: number, video: Partial<InsertVideo>): Promise<Video | undefined>;
   deleteVideo(id: number): Promise<boolean>;
+  deleteVideosByChannelId(channelId: number): Promise<void>;
   
   // Job Logs
   getJobLogs(limit?: number): Promise<JobLog[]>;
   createJobLog(log: InsertJobLog): Promise<JobLog>;
   deleteOldLogs(daysOld: number): Promise<void>;
+  deleteJobLogsByEntityId(entityId: number): Promise<void>;
   
   // Channel associations
   addTemplateToChannel(channelId: number, templateId: number): Promise<void>;
@@ -109,6 +111,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteChannel(id: number): Promise<boolean> {
+    // Delete related data first
+    await this.deleteVideosByChannelId(id);
+    await this.deleteJobLogsByEntityId(id);
+    
+    // Delete channel-template associations
+    await db.delete(channelTemplates).where(eq(channelTemplates.channelId, id));
+    
+    // Delete channel-thumbnail associations
+    await db.delete(channelThumbnails).where(eq(channelThumbnails.channelId, id));
+    
+    // Finally delete the channel
     const result = await db.delete(channels).where(eq(channels.id, id));
     return (result.rowCount ?? 0) > 0;
   }
@@ -245,6 +258,10 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount ?? 0) > 0;
   }
 
+  async deleteVideosByChannelId(channelId: number): Promise<void> {
+    await db.delete(videos).where(eq(videos.channelId, channelId));
+  }
+
   // Job Logs
   async getJobLogs(limit: number = 100): Promise<JobLog[]> {
     return await db.select().from(jobLogs).orderBy(desc(jobLogs.createdAt)).limit(limit);
@@ -262,6 +279,10 @@ export class DatabaseStorage implements IStorage {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysOld);
     await db.delete(jobLogs).where(eq(jobLogs.createdAt, cutoffDate));
+  }
+
+  async deleteJobLogsByEntityId(entityId: number): Promise<void> {
+    await db.delete(jobLogs).where(eq(jobLogs.entityId, entityId));
   }
 
   // Channel associations
