@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TestTube, Play, Download, Eye, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Channel, VideoTemplate } from "@shared/schema";
@@ -25,9 +26,21 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
   const { toast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
   const [testProgress, setTestProgress] = useState<TestProgress | null>(null);
+  const [currentVideoId, setCurrentVideoId] = useState<number | null>(null);
+  const [isVideoPreviewOpen, setIsVideoPreviewOpen] = useState(false);
 
   const { data: templates } = useQuery<VideoTemplate[]>({
     queryKey: ['/api/video-templates'],
+  });
+
+  const { data: currentVideo } = useQuery({
+    queryKey: ['/api/videos', currentVideoId],
+    queryFn: async () => {
+      if (!currentVideoId) return null;
+      const response = await apiRequest("GET", `/api/videos/${currentVideoId}`);
+      return response.json();
+    },
+    enabled: !!currentVideoId,
   });
 
   const generateTestVideoMutation = useMutation({
@@ -41,8 +54,16 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
     },
     onSuccess: (res) => {
       toast({ title: "Test video generation started" });
+      setTestProgress({
+        stage: "complete",
+        progress: 100,
+        message: ""
+      });
+      res.json().then((data) => {
+        setCurrentVideoId(data.videoId);
+      });
       // Start polling for progress
-      res.json().then((data) => pollProgress(data.videoId));
+      // res.json().then((data) => pollProgress(data.videoId));
     },
     onError: () => {
       toast({ title: "Failed to start test generation", variant: "destructive" });
@@ -80,6 +101,33 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
       channelId: channel.id,
       templateId: selectedTemplate
     });
+  };
+
+  const handleDownloadVideo = () => {
+    if (!currentVideoId) {
+      toast({ title: "No video available for download", variant: "destructive" });
+      return;
+    }
+
+    // Create a temporary link to trigger download
+    const link = document.createElement('a');
+    link.href = `/api/videos/${currentVideoId}/download`;
+    link.download = `test_video_${currentVideoId}.mp4`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({ title: "Download started" });
+  };
+
+  const handlePreviewVideo = () => {
+    if (!currentVideoId) {
+      toast({ title: "No video available for preview", variant: "destructive" });
+      return;
+    }
+
+    // Open video preview modal
+    setIsVideoPreviewOpen(true);
   };
 
   const getStageIcon = (stage: string) => {
@@ -183,11 +231,11 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
           
           {testProgress?.progress === 100 && (
             <>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handlePreviewVideo}>
                 <Eye className="h-4 w-4 mr-2" />
                 Preview
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handleDownloadVideo}>
                 <Download className="h-4 w-4 mr-2" />
                 Download
               </Button>
@@ -204,6 +252,46 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
           </AlertDescription>
         </Alert>
       </CardContent>
+
+      {/* Video Preview Modal */}
+      <Dialog open={isVideoPreviewOpen} onOpenChange={setIsVideoPreviewOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                <span>Video Preview</span>
+                {currentVideo?.title && (
+                  <Badge variant="secondary" className="text-xs">
+                    {currentVideo.title}
+                  </Badge>
+                )}
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="relative">
+            {currentVideoId && (
+              <video
+                controls
+                className="w-full h-auto max-h-[70vh] rounded-lg"
+                src={`/api/videos/${currentVideoId}/preview`}
+              >
+                Your browser does not support the video tag.
+              </video>
+            )}
+            {currentVideo && (
+              <div className="mt-4 p-4 bg-muted rounded-lg">
+                <h4 className="font-medium mb-2">Video Details</h4>
+                <div className="text-sm space-y-1">
+                  <p><strong>Title:</strong> {currentVideo.title}</p>
+                  <p><strong>Status:</strong> {currentVideo.status}</p>
+                  <p><strong>Created:</strong> {new Date(currentVideo.createdAt).toLocaleString()}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

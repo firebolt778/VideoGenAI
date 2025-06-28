@@ -6,6 +6,7 @@ import { insertChannelSchema, insertVideoTemplateSchema, insertThumbnailTemplate
 import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
+import * as fsSync from "fs";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -141,6 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ message: "Failed to delete channel" });
       }
     } catch (error) {
+      console.error(error);
       res.status(500).json({ message: "Failed to delete channel" });
     }
   });
@@ -303,6 +305,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/videos/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const video = await storage.getVideo(id);
+      if (!video) {
+        return res.status(404).json({ message: "Video not found" });
+      }
+      res.json(video);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch video" });
+    }
+  });
+
   app.post("/api/videos/test/:channelId", async (req, res) => {
     try {
       const channelId = parseInt(req.params.channelId);
@@ -449,6 +464,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Progress error:', error);
       res.status(500).json({ message: "Failed to fetch progress" });
+    }
+  });
+
+  // Video download endpoint
+  app.get("/api/videos/:id/download", async (req, res) => {
+    try {
+      const videoId = parseInt(req.params.id);
+      const video = await storage.getVideo(videoId);
+      
+      if (!video) {
+        return res.status(404).json({ message: "Video not found" });
+      }
+
+      if (!video.videoUrl) {
+        return res.status(404).json({ message: "Video file not found" });
+      }
+
+      const videoPath = path.resolve(video.videoUrl);
+      
+      // Check if file exists
+      if (!fsSync.existsSync(videoPath)) {
+        return res.status(404).json({ message: "Video file not found on disk" });
+      }
+
+      // Set headers for file download
+      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('Content-Disposition', `attachment; filename="${video.title || `video_${videoId}`}.mp4"`);
+      
+      // Stream the file
+      const fileStream = fsSync.createReadStream(videoPath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error('Video download error:', error);
+      res.status(500).json({ message: "Failed to download video" });
+    }
+  });
+
+  // Video preview endpoint
+  app.get("/api/videos/:id/preview", async (req, res) => {
+    try {
+      const videoId = parseInt(req.params.id);
+      const video = await storage.getVideo(videoId);
+      
+      if (!video) {
+        return res.status(404).json({ message: "Video not found" });
+      }
+
+      if (!video.videoUrl) {
+        return res.status(404).json({ message: "Video file not found" });
+      }
+
+      const videoPath = path.resolve(video.videoUrl);
+      
+      // Check if file exists
+      if (!fsSync.existsSync(videoPath)) {
+        return res.status(404).json({ message: "Video file not found on disk" });
+      }
+
+      // Get file stats
+      const stats = fsSync.statSync(videoPath);
+      const fileSize = stats.size;
+      const range = req.headers.range;
+
+      if (range) {
+        // Handle range requests for video streaming
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = (end - start) + 1;
+
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunksize,
+          'Content-Type': 'video/mp4',
+        });
+
+        const stream = fsSync.createReadStream(videoPath, { start, end });
+        stream.pipe(res);
+      } else {
+        // Full file request
+        res.writeHead(200, {
+          'Content-Length': fileSize,
+          'Content-Type': 'video/mp4',
+        });
+
+        const stream = fsSync.createReadStream(videoPath);
+        stream.pipe(res);
+      }
+    } catch (error) {
+      console.error('Video preview error:', error);
+      res.status(500).json({ message: "Failed to preview video" });
     }
   });
 
