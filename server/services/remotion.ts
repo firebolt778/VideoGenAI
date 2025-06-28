@@ -35,6 +35,7 @@ export interface RemotionVideoConfig {
     position: string;
     wordsPerTime: number;
   };
+  [key: string]: unknown; // Index signature for additional properties
 }
 
 export class RemotionService {
@@ -69,7 +70,7 @@ export class RemotionService {
         throw new Error('Failed to create bundle');
       }
 
-      const assetBaseUrl = process.env.ASSET_BASE_URL || "http://127.0.0.1:5000";
+      const assetBaseUrl = process.env.ASSET_BASE_URL || "http://127.0.0.1:5000/";
       const len = config.images.length;
       for (let i = 0; i < len; i++) {
         config.images[i].filename =
@@ -152,7 +153,7 @@ export const RemotionVideo: React.FC = () => {
     // Create StoryVideo component
     const storyVideoContent = `
 import React from 'react';
-import { useCurrentFrame, useVideoConfig, Img, Audio, AbsoluteFill } from 'remotion';
+import { useCurrentFrame, useVideoConfig, Img, Audio, AbsoluteFill, Sequence } from 'remotion';
 
 interface StoryVideoProps {
   title: string;
@@ -239,11 +240,12 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
 
       {/* Audio */}
       {audioSegments.map((segment, index) => (
-        <Audio
+        <Sequence
           key={index}
-          src={segment.filename}
-          delayRenderTimeoutInMilliseconds={segment.duration}
-        />
+          from={(audioSegments.slice(0, index).reduce((sum, s) => sum + s.duration, 0) / 1000) * fps}
+        >
+          <Audio src={segment.filename} />
+        </Sequence>
       ))}
 
       {/* Watermark */}
