@@ -1,8 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tv, Play, Clock, AlertTriangle } from "lucide-react";
+import { Tv, Play, Clock, AlertTriangle, PlayCircle, PauseCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { Badge } from "@/components/ui/badge";
 
 interface DashboardStats {
   activeChannels: number;
@@ -11,9 +15,65 @@ interface DashboardStats {
   failedJobs: number;
 }
 
+interface ScheduledJob {
+  id: string;
+  channelId: number;
+  templateId: number;
+  scheduledAt: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  retryCount: number;
+  maxRetries: number;
+}
+
 export default function Dashboard() {
+  const { toast } = useToast();
+  
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/stats'],
+  });
+
+  const { data: scheduledJobs, refetch: refetchJobs } = useQuery<ScheduledJob[]>({
+    queryKey: ['/api/scheduler/jobs'],
+  });
+
+  const startSchedulerMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/scheduler/start');
+    },
+    onSuccess: () => {
+      toast({
+        title: "Scheduler started",
+        description: "Automated video generation is now active",
+      });
+      refetchJobs();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to start scheduler",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const stopSchedulerMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/scheduler/stop');
+    },
+    onSuccess: () => {
+      toast({
+        title: "Scheduler stopped",
+        description: "Automated video generation has been paused",
+      });
+      refetchJobs();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to stop scheduler",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const statCards = [
@@ -46,6 +106,9 @@ export default function Dashboard() {
       bgColor: "bg-red-100",
     },
   ];
+
+  const pendingJobs = scheduledJobs?.filter(job => job.status === 'pending') || [];
+  const runningJobs = scheduledJobs?.filter(job => job.status === 'running') || [];
 
   return (
     <>
@@ -86,8 +149,46 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* Recent Activity or Additional Dashboard Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Scheduler Controls */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card>
+            <CardContent className="p-6">
+              <h3 className="text-lg font-medium text-foreground mb-4">Scheduler Control</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Automated Generation</span>
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      onClick={() => startSchedulerMutation.mutate()}
+                      disabled={startSchedulerMutation.isPending}
+                    >
+                      <PlayCircle className="w-4 h-4 mr-2" />
+                      Start
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => stopSchedulerMutation.mutate()}
+                      disabled={stopSchedulerMutation.isPending}
+                    >
+                      <PauseCircle className="w-4 h-4 mr-2" />
+                      Stop
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Pending Jobs</span>
+                  <span className="font-semibold">{pendingJobs.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Running Jobs</span>
+                  <span className="font-semibold">{runningJobs.length}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardContent className="p-6">
               <h3 className="text-lg font-medium text-foreground mb-4">System Status</h3>
@@ -113,23 +214,33 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="text-lg font-medium text-foreground mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <button className="w-full text-left p-3 rounded-lg border border-border hover:bg-accent transition-colors">
-                  <div className="font-medium text-foreground">Create Test Video</div>
-                  <div className="text-sm text-muted-foreground">Generate a test video without publishing</div>
-                </button>
-                <button className="w-full text-left p-3 rounded-lg border border-border hover:bg-accent transition-colors">
-                  <div className="font-medium text-foreground">View Logs</div>
-                  <div className="text-sm text-muted-foreground">Check recent system activity</div>
-                </button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
+
+        {/* Recent Activity */}
+        <Card>
+          <CardContent className="p-6">
+            <h3 className="text-lg font-medium text-foreground mb-4">Recent Scheduled Jobs</h3>
+            {scheduledJobs && scheduledJobs.length > 0 ? (
+              <div className="space-y-3">
+                {scheduledJobs.slice(0, 5).map((job) => (
+                  <div key={job.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">Channel {job.channelId}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Scheduled: {new Date(job.scheduledAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <Badge variant={job.status === 'completed' ? 'default' : job.status === 'failed' ? 'destructive' : 'secondary'}>
+                      {job.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No scheduled jobs found.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </>
   );

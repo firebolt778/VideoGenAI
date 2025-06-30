@@ -27,6 +27,8 @@ export interface RemotionVideoConfig {
     kenBurnsSpeed?: number;
     kenBurnsDirection?: string;
     filmGrain?: boolean;
+    fog?: boolean;
+    fogIntensity?: number;
   };
   captions?: {
     enabled: boolean;
@@ -35,7 +37,11 @@ export interface RemotionVideoConfig {
     position: string;
     wordsPerTime: number;
   };
-  [key: string]: unknown; // Index signature for additional properties
+  transitions?: {
+    type: string;
+    duration: number;
+  };
+  [key: string]: unknown;
 }
 
 export class RemotionService {
@@ -43,14 +49,11 @@ export class RemotionService {
 
   async initializeBundle(): Promise<void> {
     try {
-      // Create Remotion composition directory if it doesn't exist
       const compositionsDir = path.join(process.cwd(), 'remotion');
       await fs.mkdir(compositionsDir, { recursive: true });
 
-      // Create a basic composition file
       await this.createComposition(compositionsDir);
 
-      // Bundle the composition
       this.bundlePath = await bundle({
         entryPoint: path.join(compositionsDir, 'index.ts'),
         webpackOverride: (config) => config,
@@ -94,9 +97,8 @@ export class RemotionService {
         throw new Error('No composition found');
       }
 
-      // Calculate video duration based on audio segments
       const totalDuration = config.audioSegments.reduce((sum, segment) => sum + segment.duration, 0);
-      const durationInFrames = Math.ceil((totalDuration / 1000) * 30); // 30 FPS
+      const durationInFrames = Math.ceil((totalDuration / 1000) * 30);
 
       await renderMedia({
         composition: {
@@ -117,7 +119,6 @@ export class RemotionService {
   }
 
   private async createComposition(compositionsDir: string): Promise<void> {
-    // Create index.tsx
     const indexContent = `
 import { registerRoot } from 'remotion';
 import { RemotionVideo } from './Root';
@@ -127,7 +128,6 @@ registerRoot(RemotionVideo);
 
     await fs.writeFile(path.join(compositionsDir, 'index.ts'), indexContent);
 
-    // Create index.tsx
     const rootContent = `
 import { Composition } from 'remotion';
 import { StoryVideo } from './StoryVideo';
@@ -150,10 +150,9 @@ export const RemotionVideo: React.FC = () => {
 
     await fs.writeFile(path.join(compositionsDir, 'Root.tsx'), rootContent);
 
-    // Create StoryVideo component
     const storyVideoContent = `
 import React from 'react';
-import { useCurrentFrame, useVideoConfig, Img, Audio, AbsoluteFill, Sequence } from 'remotion';
+import { useCurrentFrame, useVideoConfig, Img, Audio, AbsoluteFill, Sequence, interpolate, spring } from 'remotion';
 
 interface StoryVideoProps {
   title: string;
@@ -179,6 +178,8 @@ interface StoryVideoProps {
     kenBurnsSpeed?: number;
     kenBurnsDirection?: string;
     filmGrain?: boolean;
+    fog?: boolean;
+    fogIntensity?: number;
   };
   captions?: {
     enabled: boolean;
@@ -186,6 +187,10 @@ interface StoryVideoProps {
     color: string;
     position: string;
     wordsPerTime: number;
+  };
+  transitions?: {
+    type: string;
+    duration: number;
   };
 }
 
@@ -196,96 +201,173 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   images,
   watermark,
   effects,
-  captions
+  captions,
+  transitions
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Calculate which image should be shown based on current frame
-  const currentTime = (frame / fps) * 1000; // Convert to milliseconds
-  let currentImageIndex = 0;
-  let audioOffset = 0;
+  const renderImage = (image: any, index: number) => {
+    const segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
+    const segmentDuration = audioSegments[index]?.duration || 0;
+    const segmentFrames = Math.ceil((segmentDuration / 1000) * fps);
+    
+    const isActive = frame >= segmentStart / 1000 * fps && frame < (segmentStart + segmentDuration) / 1000 * fps;
+    
+    if (!isActive) return null;
 
-  for (let i = 0; i < audioSegments.length; i++) {
-    if (currentTime >= audioOffset && currentTime < audioOffset + audioSegments[i].duration) {
-      currentImageIndex = Math.min(i, images.length - 1);
-      break;
-    }
-    audioOffset += audioSegments[i].duration;
-  }
+    const kenBurnsScale = effects?.kenBurns ? 
+      interpolate(frame, [segmentStart / 1000 * fps, (segmentStart + segmentDuration) / 1000 * fps], [1, 1.1]) : 1;
+    
+    const kenBurnsX = effects?.kenBurns ? 
+      interpolate(frame, [segmentStart / 1000 * fps, (segmentStart + segmentDuration) / 1000 * fps], [0, 0.05]) : 0;
+    
+    const kenBurnsY = effects?.kenBurns ? 
+      interpolate(frame, [segmentStart / 1000 * fps, (segmentStart + segmentDuration) / 1000 * fps], [0, 0.05]) : 0;
 
-  const currentImage = images[currentImageIndex];
-  const segment = audioSegments[currentImageIndex];
-
-  // Ken Burns effect calculation
-  const kenBurnsScale = effects?.kenBurns 
-    ? 1 + (frame / 3000) * 0.1 // Gradual zoom
-    : 1;
-
-  return (
-    <AbsoluteFill>
-      {/* Background Image */}
-      {currentImage && (
+    return (
+      <AbsoluteFill key={index}>
         <Img
-          src={currentImage.filename}
+          src={image.filename}
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            transform: \`scale(\${kenBurnsScale})\`,
-            filter: effects?.filmGrain ? 'contrast(1.1) saturate(1.1)' : 'none'
+            transform: \`scale(\${kenBurnsScale}) translate(\${kenBurnsX * 100}%, \${kenBurnsY * 100}%)\`,
+            transition: 'transform 0.5s ease-in-out'
           }}
         />
-      )}
+        {effects?.fog && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: \`linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))\`,
+              opacity: effects.fogIntensity || 0.3,
+              pointerEvents: 'none'
+            }}
+          />
+        )}
+        {effects?.filmGrain && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: \`url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noise)" opacity="0.1"/></svg>')\`,
+              opacity: 0.1,
+              pointerEvents: 'none'
+            }}
+          />
+        )}
+      </AbsoluteFill>
+    );
+  };
 
-      {/* Audio */}
-      {audioSegments.map((segment, index) => (
-        <Sequence
-          key={index}
-          from={(audioSegments.slice(0, index).reduce((sum, s) => sum + s.duration, 0) / 1000) * fps}
-        >
-          <Audio src={segment.filename} />
-        </Sequence>
-      ))}
+  const renderCaptions = () => {
+    if (!captions?.enabled) return null;
 
-      {/* Watermark */}
-      {watermark && (
-        <Img
-          src={watermark.url}
-          style={{
-            position: 'absolute',
-            [watermark.position.includes('top') ? 'top' : 'bottom']: '20px',
-            [watermark.position.includes('left') ? 'left' : 'right']: '20px',
-            opacity: watermark.opacity / 100,
-            width: \`\${watermark.size}%\`,
-            height: 'auto',
-          }}
-        />
-      )}
+    const currentSegmentIndex = audioSegments.findIndex((_, index) => {
+      const segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
+      const segmentEnd = segmentStart + audioSegments[index]?.duration;
+      return frame >= segmentStart / 1000 * fps && frame < segmentEnd / 1000 * fps;
+    });
 
-      {/* Captions */}
-      {captions?.enabled && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: captions.position === 'bottom' ? '60px' : 'auto',
-            top: captions.position === 'top' ? '60px' : 'auto',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            fontFamily: captions.font,
-            color: captions.color,
-            fontSize: '24px',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-            maxWidth: '80%',
-          }}
-        >
-          {/* Simple caption display - in production, this would be more sophisticated */}
-          {/* {script.substring(0, 100)}... */}
-          {segment?.text || ""}
-        </div>
-      )}
+    if (currentSegmentIndex === -1) return null;
+
+    const currentSegment = audioSegments[currentSegmentIndex];
+    const words = currentSegment.text.split(' ');
+    const wordsPerTime = captions.wordsPerTime || 3;
+    const wordIndex = Math.floor((frame / fps) * wordsPerTime) % words.length;
+    const displayWords = words.slice(0, wordIndex + 1).join(' ');
+
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          bottom: captions.position === 'bottom' ? '10%' : '50%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          color: captions.color || '#ffffff',
+          fontFamily: captions.font || 'Inter, sans-serif',
+          fontSize: '48px',
+          fontWeight: 'bold',
+          textAlign: 'center',
+          textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+          maxWidth: '80%',
+          lineHeight: 1.2
+        }}
+      >
+        {displayWords}
+      </div>
+    );
+  };
+
+  const renderWatermark = () => {
+    if (!watermark) return null;
+
+    const position = watermark.position || 'bottom-right';
+    const style: React.CSSProperties = {
+      position: 'absolute',
+      width: \`\${watermark.size}%\`,
+      height: 'auto',
+      opacity: watermark.opacity / 100,
+      zIndex: 10
+    };
+
+    switch (position) {
+      case 'top-left':
+        style.top = '5%';
+        style.left = '5%';
+        break;
+      case 'top-right':
+        style.top = '5%';
+        style.right = '5%';
+        break;
+      case 'bottom-left':
+        style.bottom = '5%';
+        style.left = '5%';
+        break;
+      case 'bottom-right':
+      default:
+        style.bottom = '5%';
+        style.right = '5%';
+        break;
+    }
+
+    return (
+      <Img
+        src={watermark.url}
+        style={style}
+      />
+    );
+  };
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      {/* Render images with effects */}
+      {images.map((image, index) => renderImage(image, index))}
+      
+      {/* Render captions */}
+      {renderCaptions()}
+      
+      {/* Render watermark */}
+      {renderWatermark()}
+      
+      {/* Render audio segments */}
+      {audioSegments.map((segment, index) => {
+        const segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
+        return (
+          <Sequence key={index} from={segmentStart / 1000 * fps}>
+            <Audio src={segment.filename} />
+          </Sequence>
+        );
+      })}
     </AbsoluteFill>
   );
 };
@@ -296,8 +378,6 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
 
   async generateThumbnail(videoPath: string, outputPath: string, timeInSeconds: number = 5): Promise<string> {
     try {
-      // This would typically use FFmpeg to extract a frame from the video
-      // For now, we'll use a placeholder implementation
       const ffmpeg = await import('fluent-ffmpeg');
       
       return new Promise((resolve, reject) => {

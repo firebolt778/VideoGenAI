@@ -3,9 +3,11 @@ import { elevenLabsService } from "./elevenlabs";
 import { fluxService } from "./flux";
 import { remotionService, RemotionVideoConfig } from "./remotion";
 import { youtubeService } from "./youtube";
+import { backgroundMusicService } from "./background-music";
 import { ShortcodeProcessor, type ShortcodeContext } from "./shortcode";
 import { storage } from "../storage";
 import type { Channel, VideoTemplate, Video } from "@shared/schema";
+import path from "path";
 
 export interface VideoGenerationProgress {
   videoId: number;
@@ -244,7 +246,11 @@ export class VideoWorkflowService {
   }
 
   private async generateAudio(template: VideoTemplate, imageAssignments: any[]) {
-    const audioSegments = [];
+    const audioSegments: Array<{
+      text: string;
+      filename: string;
+      duration?: number;
+    }> = [];
     
     for (let i = 0; i < imageAssignments.length; i++) {
       const assignment = imageAssignments[i];
@@ -265,6 +271,40 @@ export class VideoWorkflowService {
           filename: `placeholder_${i + 1}.mp3`,
           duration: assignment.scriptSegment.length * 0.1 // Rough estimate
         });
+      }
+    }
+
+    // Generate background music if enabled
+    if (template.backgroundMusicPrompt) {
+      try {
+        const totalDuration = audioSegments.reduce((sum, seg) => sum + (seg.duration || 0), 0) / 1000; // Convert to seconds
+        
+        const music = await backgroundMusicService.generateMusic({
+          prompt: template.backgroundMusicPrompt,
+          duration: Math.ceil(totalDuration),
+          style: template.musicStyle || 'Ambient',
+          mood: template.musicMood || 'Calm',
+          volume: template.musicVolume || 30
+        });
+
+        // Mix background music with audio segments
+        for (let i = 0; i < audioSegments.length; i++) {
+          const segment = audioSegments[i];
+          const mixedAudioPath = await backgroundMusicService.mixAudioWithMusic(
+            `uploads/audio/${segment.filename}`,
+            `uploads/music/${music.filename}`,
+            music.volume
+          );
+          
+          // Update segment filename to point to mixed audio
+          audioSegments[i] = {
+            ...segment,
+            filename: path.basename(mixedAudioPath)
+          };
+        }
+      } catch (error) {
+        console.error('Failed to generate background music:', error);
+        // Continue without background music
       }
     }
 

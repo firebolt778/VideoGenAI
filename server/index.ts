@@ -1,6 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { storage } from "./storage";
+import { schedulerService } from "./services/scheduler";
 
 const app = express();
 app.use(express.json());
@@ -36,8 +38,28 @@ app.use((req, res, next) => {
   next();
 });
 
+let server: any;
+
+async function startServer() {
+  try {
+    // Start scheduler service
+    await schedulerService.start();
+    
+    // Register routes and start server
+    server = await registerRoutes(app);
+    
+    const port = process.env.PORT || 5000;
+    server.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
 (async () => {
-  const server = await registerRoutes(app);
+  await startServer();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -55,16 +77,4 @@ app.use((req, res, next) => {
   } else {
     serveStatic(app);
   }
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    // reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
 })();

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Channels from "@/pages/channels";
 import VideoTemplates from "@/pages/video-templates";
+import Videos from "@/pages/videos";
 import Thumbnails from "@/pages/thumbnails";
 import Hooks from "@/pages/hooks";
 import Logs from "@/pages/logs";
@@ -23,6 +24,7 @@ function Router() {
           <Route path="/" component={() => <Redirect to="/channels" />} />
           <Route path="/channels" component={Channels} />
           <Route path="/video-templates" component={VideoTemplates} />
+          <Route path="/videos" component={Videos} />
           <Route path="/thumbnails" component={Thumbnails} />
           <Route path="/hooks" component={Hooks} />
           <Route path="/logs" component={Logs} />

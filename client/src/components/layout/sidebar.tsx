@@ -8,13 +8,15 @@ import {
   ListChecks, 
   BarChart3, 
   User,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Play
 } from "lucide-react";
 
 const navigation = [
   // { name: 'Dashboard', href: '/', icon: BarChart3 },
   { name: 'Channels', href: '/channels', icon: Tv },
   { name: 'Video Templates', href: '/video-templates', icon: Film },
+  { name: 'Videos', href: '/videos', icon: Play },
   { name: 'Thumbnails', href: '/thumbnails', icon: Image },
   { name: 'Hooks', href: '/hooks', icon: PlayCircle },
   { name: 'Logs & Debug', href: '/logs', icon: ListChecks },

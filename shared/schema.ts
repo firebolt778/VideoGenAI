@@ -62,6 +62,8 @@ export const videoTemplates = pgTable("video_templates", {
   audioVoices: text("audio_voices").array(),
   audioPauseGap: integer("audio_pause_gap").default(500), // milliseconds
   backgroundMusicPrompt: text("background_music_prompt"),
+  musicStyle: text("music_style").default("Ambient"),
+  musicMood: text("music_mood").default("Calm"),
   musicVolume: integer("music_volume").default(30),
   videoEffects: jsonb("video_effects").$type<{
     kenBurns: boolean;

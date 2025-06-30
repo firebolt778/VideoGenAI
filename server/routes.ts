@@ -309,8 +309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Video routes
   app.get("/api/videos", async (req, res) => {
     try {
-      const channelId = req.query.channelId ? parseInt(req.query.channelId as string) : undefined;
-      const videos = await storage.getVideos(channelId);
+      const videos = await storage.getVideos();
       res.json(videos);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch videos" });
@@ -613,6 +612,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Serve uploaded files
   app.use('/uploads', express.static('uploads'));
+
+  // Scheduler routes
+  app.post("/api/scheduler/start", async (req, res) => {
+    try {
+      const { schedulerService } = await import("./services/scheduler");
+      await schedulerService.start();
+      res.json({ message: "Scheduler started successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to start scheduler" });
+    }
+  });
+
+  app.post("/api/scheduler/stop", async (req, res) => {
+    try {
+      const { schedulerService } = await import("./services/scheduler");
+      await schedulerService.stop();
+      res.json({ message: "Scheduler stopped successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to stop scheduler" });
+    }
+  });
+
+  app.get("/api/scheduler/jobs", async (req, res) => {
+    try {
+      const { schedulerService } = await import("./services/scheduler");
+      const jobs = await schedulerService.getScheduledJobs();
+      res.json(jobs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch scheduled jobs" });
+    }
+  });
+
+  app.post("/api/scheduler/schedule/:channelId", async (req, res) => {
+    try {
+      const channelId = parseInt(req.params.channelId);
+      const channel = await storage.getChannel(channelId);
+      
+      if (!channel) {
+        return res.status(404).json({ message: "Channel not found" });
+      }
+
+      const { schedulerService } = await import("./services/scheduler");
+      await schedulerService.scheduleChannelVideos(channel);
+      
+      res.json({ message: "Channel videos scheduled successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to schedule channel videos" });
+    }
+  });
+
+  app.delete("/api/scheduler/jobs/:jobId", async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const { schedulerService } = await import("./services/scheduler");
+      const cancelled = await schedulerService.cancelJob(jobId);
+      
+      if (cancelled) {
+        res.json({ message: "Job cancelled successfully" });
+      } else {
+        res.status(404).json({ message: "Job not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to cancel job" });
+    }
+  });
+
+  // Analytics routes
+  app.get("/api/analytics", async (req, res) => {
+    try {
+      const channels = await storage.getChannels();
+      const videos = await storage.getVideos();
+      const logs = await storage.getJobLogs(100);
+      
+      const totalVideos = videos.length;
+      const publishedVideos = videos.filter(v => v.status === 'published').length;
+      const errorVideos = videos.filter(v => v.status === 'error').length;
+      const successRate = totalVideos > 0 ? ((publishedVideos / totalVideos) * 100) : 0;
+      
+      // Mock analytics data for now
+      const analytics = {
+        totalVideos,
+        totalViews: 15420, // Mock data
+        totalLikes: 892, // Mock data
+        totalComments: 156, // Mock data
+        videosThisWeek: 7, // Mock data
+        averageDuration: 180, // Mock data
+        successRate: Math.round(successRate * 10) / 10,
+        channelStats: channels.map(channel => ({
+          name: channel.name,
+          videos: videos.filter(v => v.channelId === channel.id).length,
+          views: Math.floor(Math.random() * 10000) + 1000 // Mock data
+        })),
+        statusDistribution: [
+          { status: "Published", count: publishedVideos },
+          { status: "Generating", count: videos.filter(v => v.status === 'generating').length },
+          { status: "Error", count: errorVideos }
+        ],
+        weeklyProgress: [
+          { date: "Mon", videos: 2, views: 1200 },
+          { date: "Tue", videos: 1, views: 800 },
+          { date: "Wed", videos: 3, views: 2100 },
+          { date: "Thu", videos: 2, views: 1500 },
+          { date: "Fri", videos: 1, views: 900 },
+          { date: "Sat", videos: 0, views: 600 },
+          { date: "Sun", videos: 1, views: 1100 }
+        ]
+      };
+      
+      res.json(analytics);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

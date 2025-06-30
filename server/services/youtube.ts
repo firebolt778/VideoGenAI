@@ -8,6 +8,7 @@ export interface YouTubeVideoUpload {
   privacyStatus: 'private' | 'public' | 'unlisted';
   videoFilePath: string;
   thumbnailPath?: string;
+  scheduledAt?: Date;
 }
 
 export interface YouTubeChannel {
@@ -16,6 +17,14 @@ export interface YouTubeChannel {
   subscriberCount: string;
   viewCount: string;
   videoCount: string;
+}
+
+export interface YouTubeScheduleSettings {
+  defaultPrivacy: 'private' | 'public' | 'unlisted';
+  defaultCategory: string;
+  defaultTags: string[];
+  scheduleBuffer: number; // minutes before scheduled time
+  autoPublish: boolean;
 }
 
 export class YouTubeService {
@@ -74,7 +83,8 @@ export class YouTubeService {
             categoryId: upload.categoryId,
           },
           status: {
-            privacyStatus: upload.privacyStatus,
+            privacyStatus: upload.scheduledAt ? 'private' : upload.privacyStatus,
+            publishAt: upload.scheduledAt?.toISOString(),
           },
         },
         media: {
@@ -164,6 +174,84 @@ export class YouTubeService {
     } catch (error) {
       throw new Error(`Failed to schedule video: ${(error as Error).message}`);
     }
+  }
+
+  async updateVideoPrivacy(videoId: string, privacyStatus: 'private' | 'public' | 'unlisted'): Promise<void> {
+    try {
+      await this.youtube.videos.update({
+        part: ['status'],
+        requestBody: {
+          id: videoId,
+          status: {
+            privacyStatus,
+          },
+        },
+      });
+    } catch (error) {
+      throw new Error(`Failed to update video privacy: ${(error as Error).message}`);
+    }
+  }
+
+  async updateVideoMetadata(videoId: string, metadata: {
+    title?: string;
+    description?: string;
+    tags?: string[];
+    categoryId?: string;
+  }): Promise<void> {
+    try {
+      const updateData: any = { id: videoId };
+      
+      if (metadata.title || metadata.description || metadata.tags || metadata.categoryId) {
+        updateData.snippet = {};
+        if (metadata.title) updateData.snippet.title = metadata.title;
+        if (metadata.description) updateData.snippet.description = metadata.description;
+        if (metadata.tags) updateData.snippet.tags = metadata.tags;
+        if (metadata.categoryId) updateData.snippet.categoryId = metadata.categoryId;
+      }
+
+      await this.youtube.videos.update({
+        part: ['snippet'],
+        requestBody: updateData,
+      });
+    } catch (error) {
+      throw new Error(`Failed to update video metadata: ${(error as Error).message}`);
+    }
+  }
+
+  async getScheduledVideos(): Promise<any[]> {
+    try {
+      const response = await this.youtube.search.list({
+        part: ['snippet'],
+        forMine: true,
+        type: ['video'],
+        eventType: 'upcoming',
+        maxResults: 50,
+      });
+
+      return response.data.items || [];
+    } catch (error) {
+      throw new Error(`Failed to get scheduled videos: ${(error as Error).message}`);
+    }
+  }
+
+  async deleteVideo(videoId: string): Promise<void> {
+    try {
+      await this.youtube.videos.delete({
+        id: videoId,
+      });
+    } catch (error) {
+      throw new Error(`Failed to delete video: ${(error as Error).message}`);
+    }
+  }
+
+  getDefaultScheduleSettings(): YouTubeScheduleSettings {
+    return {
+      defaultPrivacy: 'private',
+      defaultCategory: '24', // Entertainment
+      defaultTags: ['AI Generated', 'Automated', 'Story'],
+      scheduleBuffer: 15, // 15 minutes buffer
+      autoPublish: false,
+    };
   }
 }
 
