@@ -117,8 +117,16 @@ export class SchedulerService {
         details: { jobId: job.id, templateId: job.templateId }
       });
 
+      // Create video record
+      const video = await storage.createVideo({
+        channelId: job.channelId,
+        templateId: template.id,
+        title: "Generating...",
+        status: "generating",
+      });
+
       // Generate video
-      await videoWorkflowService.generateVideo(job.channelId, template, false);
+      await videoWorkflowService.generateVideo(video.id, job.channelId, template, false);
       
       job.status = 'completed';
       

@@ -20,27 +20,19 @@ export interface VideoGenerationProgress {
 export class VideoWorkflowService {
   private progressCallbacks: Map<number, (progress: VideoGenerationProgress) => void> = new Map();
 
-  async generateVideo(channelId: number, template: VideoTemplate, testMode: boolean = false): Promise<Video> {
+  async generateVideo(videoId: number, channelId: number, template: VideoTemplate, testMode: boolean = false): Promise<void> {
     const channel = await storage.getChannel(channelId);
   
     if (!channel || !template) {
       throw new Error("Channel or template not found");
     }
 
-    // Create video record
-    const video = await storage.createVideo({
-      channelId,
-      templateId: template.id,
-      title: "Generating...",
-      status: "generating",
-    });
-
     try {
-      await this.logProgress(video.id, "initialization", 0, "Starting video generation workflow");
+      await this.logProgress(videoId, "initialization", 0, "Starting video generation workflow");
 
       // Step 1: Select and process idea
       const selectedIdea = this.selectIdea(template);
-      await this.logProgress(video.id, "idea_selection", 10, `Selected idea: ${selectedIdea.substring(0, 50)}...`);
+      await this.logProgress(videoId, "idea_selection", 10, `Selected idea: ${selectedIdea.substring(0, 50)}...`);
 
       // Step 2: Generate story outline
       const context: ShortcodeContext = {
@@ -54,54 +46,54 @@ export class VideoWorkflowService {
       context.outline = outline.raw;
       
       const title = outline.title || `${channel.name} Story`;
-      await storage.updateVideo(video.id, { title });
-      await this.logProgress(video.id, "outline", 20, `Generated outline: ${title}`);
+      await storage.updateVideo(videoId, { title });
+      await this.logProgress(videoId, "outline", 20, `Generated outline: ${title}`);
 
       // Step 3: Generate full script
       const script = await this.generateScript(template, context);
       context.script = script;
       context.title = title;
-      await this.logProgress(video.id, "script", 30, "Generated full script");
+      await this.logProgress(videoId, "script", 30, "Generated full script");
 
       // Step 4: Generate hook (if enabled)
       let hook = "";
       if (template.hookPrompt) {
         hook = await this.generateHook(template, context);
-        await this.logProgress(video.id, "hook", 35, "Generated video hook");
+        await this.logProgress(videoId, "hook", 35, "Generated video hook");
       }
 
       // Step 5: Generate images
       const images = await this.generateImages(template, context);
       context.images = images.map(img => img.description);
-      await this.logProgress(video.id, "images", 50, `Generated ${images.length} images`);
+      await this.logProgress(videoId, "images", 50, `Generated ${images.length} images`);
 
       // Step 6: Assign images to script segments
       const imageAssignments = await this.assignImages(template, context, images);
-      await this.logProgress(video.id, "image_assignment", 60, "Assigned images to script segments");
+      await this.logProgress(videoId, "image_assignment", 60, "Assigned images to script segments");
 
       // Step 7: Generate audio segments
       const audioSegments = await this.generateAudio(template, imageAssignments);
-      await this.logProgress(video.id, "audio", 70, `Generated ${audioSegments.length} audio segments`);
+      await this.logProgress(videoId, "audio", 70, `Generated ${audioSegments.length} audio segments`);
 
       // Step 8: Render video with Remotion
       const videoConfig = this.buildVideoConfig(title, script, audioSegments, images, template, channel);
-      const videoPath = await remotionService.renderVideo(videoConfig, `output/video_${video.id}.mp4`);
-      await this.logProgress(video.id, "rendering", 85, "Video rendering completed");
+      const videoPath = await remotionService.renderVideo(videoConfig, `output/video_${videoId}.mp4`);
+      await this.logProgress(videoId, "rendering", 85, "Video rendering completed");
 
       // Step 9: Generate thumbnail
-      const thumbnailPath = await this.generateThumbnail(video.id, title, script, channel);
-      await this.logProgress(video.id, "thumbnail", 90, "Generated thumbnail");
+      const thumbnailPath = await this.generateThumbnail(videoId, title, script, channel);
+      await this.logProgress(videoId, "thumbnail", 90, "Generated thumbnail");
 
       // Step 10: Upload to YouTube (if not test mode)
       let youtubeId = "";
       if (!testMode && channel.youtubeAccessToken) {
         const description = await this.generateVideoDescription(title, script, channel);
         youtubeId = await this.uploadToYouTube(videoPath, thumbnailPath, title, description, channel);
-        await this.logProgress(video.id, "upload", 95, "Uploaded to YouTube");
+        await this.logProgress(videoId, "upload", 95, "Uploaded to YouTube");
       }
 
       // Step 11: Update video record
-      await storage.updateVideo(video.id, {
+      await storage.updateVideo(videoId, {
         script,
         videoUrl: videoPath,
         thumbnailUrl: thumbnailPath,
@@ -109,19 +101,16 @@ export class VideoWorkflowService {
         status: testMode ? "test_complete" : (youtubeId ? "published" : "rendered"),
       });
 
-      await this.logProgress(video.id, "complete", 100, testMode ? "Test video generation completed" : "Video published successfully");
-
-      return await storage.getVideo(video.id) as Video;
-
+      await this.logProgress(videoId, "complete", 100, testMode ? "Test video generation completed" : "Video published successfully");
     } catch (error) {
-      await storage.updateVideo(video.id, {
+      await storage.updateVideo(videoId, {
         status: "error",
         errorMessage: error instanceof Error ? error.message : "Unknown error",
       });
       
       await storage.createJobLog({
         type: "video",
-        entityId: video.id,
+        entityId: videoId,
         status: "error",
         message: `Video generation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
         details: {

@@ -423,11 +423,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Channel or template not found" });
       }
 
+      // Create video record
+      const video = await storage.createVideo({
+        channelId,
+        templateId: template.id,
+        title: "Generating...",
+        status: "generating",
+      });
+
       // Import and start video generation workflow
       const { videoWorkflowService } = await import("./services/video-workflow");
       
       // Start generation in background
-      const video = await videoWorkflowService.generateVideo(channelId, template, testMode);
+      setImmediate(async () => {
+        try {
+          await videoWorkflowService.generateVideo(video.id, channelId, template, testMode);
+        } catch (err) {
+          console.error('Video generation error:', err);
+          throw err;
+        }
+      });
 
       res.json({
         success: true,
@@ -435,8 +450,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: testMode ? "Test video generation started" : "Video queued for generation"
       });
     } catch (error) {
-      console.error('Generate video error:', error);
-      res.status(500).json({ message: "Failed to start video generation" });
+      const e = error as Error;
+      console.error('Generate video error:', e);
+      res.status(500).json({message: `Failed to start video generation: ${e.message || "Unknown error"}` });
     }
   });
 
