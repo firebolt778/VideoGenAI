@@ -215,7 +215,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
         <div className="flex items-center gap-3">
           <Button
             onClick={handleGenerateTest}
-            disabled={!selectedTemplate || generateTestVideoMutation.isPending}
+            disabled={!selectedTemplate || generateTestVideoMutation.isPending || !!(testProgress?.progress && testProgress.progress < 100)}
             className="flex items-center gap-2"
           >
             <Play className="h-4 w-4" />
