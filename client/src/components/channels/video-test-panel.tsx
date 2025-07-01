@@ -54,16 +54,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
     },
     onSuccess: (res) => {
       toast({ title: "Test video generation started" });
-      setTestProgress({
-        stage: "complete",
-        progress: 100,
-        message: ""
-      });
-      res.json().then((data) => {
-        setCurrentVideoId(data.videoId);
-      });
-      // Start polling for progress
-      // res.json().then((data) => pollProgress(data.videoId));
+      res.json().then((data) => pollProgress(data.videoId));
     },
     onError: () => {
       toast({ title: "Failed to start test generation", variant: "destructive" });
@@ -71,6 +62,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
   });
 
   const pollProgress = (videoId: number) => {
+    setCurrentVideoId(videoId);
     const interval = setInterval(async () => {
       try {
         const response = await apiRequest("GET", `/api/videos/${videoId}/progress`);
@@ -86,6 +78,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
           }
         }
       } catch (error) {
+        console.error('Error polling progress:', error);
         clearInterval(interval);
       }
     }, 2000);
