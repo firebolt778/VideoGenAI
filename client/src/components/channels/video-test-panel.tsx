@@ -62,7 +62,6 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
   });
 
   const pollProgress = (videoId: number) => {
-    setCurrentVideoId(videoId);
     const interval = setInterval(async () => {
       try {
         const response = await apiRequest("GET", `/api/videos/${videoId}/progress`);
@@ -74,6 +73,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
           if (progress.error) {
             toast({ title: "Test generation failed", variant: "destructive" });
           } else {
+            setCurrentVideoId(videoId);
             toast({ title: "Test video completed successfully" });
           }
         }
