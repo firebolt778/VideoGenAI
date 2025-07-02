@@ -119,7 +119,7 @@ Enclose the script content between --- markers like this:
   }
 
   async generateImagePrompts(script: string, numImages: number, customPrompt?: string): Promise<ImagePrompt[]> {
-    const prompt = customPrompt || `
+    let prompt = customPrompt || `
 Analyze this script and generate ${numImages} detailed image prompts that would visually represent key scenes:
 
 Script:
@@ -131,8 +131,8 @@ For each image, create a detailed description that includes:
 - Main subject/scene
 - Artistic style (cinematic, dramatic, ethereal, etc.)
 - Mood and atmosphere
-- Lighting and color palette
-
+- Lighting and color palette`;
+    prompt += `
 Respond with JSON in this exact format:
 {
   "images": [
