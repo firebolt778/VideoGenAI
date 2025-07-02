@@ -65,9 +65,22 @@ export default function Videos() {
   };
 
   const handlePreviewVideo = (video: VideoWithDetails) => {
-    setSelectedVideo(video);
+    let videoUrl = video.videoUrl;
+    if (videoUrl) {
+      const id = videoUrl.split('_')[1].split('.')[0];
+      videoUrl = `/api/videos/${id}/preview`;
+    }
+    setSelectedVideo({
+      ...video,
+      videoUrl
+    });
     setPreviewOpen(true);
   };
+
+  const handleDownloadVideo = (videoUrl: string) => {
+    const id = videoUrl.split('_')[1].split('.')[0];
+    window.open(`/api/videos/${id}/download`, '_blank');
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -304,7 +317,7 @@ export default function Videos() {
                                 size="sm"
                                 className="h-8 w-8 p-0"
                                 title="Download Video"
-                                onClick={() => window.open(video.videoUrl || '', '_blank')}
+                                onClick={() => handleDownloadVideo(video.videoUrl || '')}
                               >
                                 <Download className="h-4 w-4" />
                               </Button>
