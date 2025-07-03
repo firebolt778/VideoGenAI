@@ -281,10 +281,10 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     if (currentSegmentIndex === -1) return null;
 
     const currentSegment = audioSegments[currentSegmentIndex];
-    const words = currentSegment.text.split(' ');
-    const wordsPerTime = captions.wordsPerTime || 3;
-    const wordIndex = Math.floor((frame / fps) * wordsPerTime) % words.length;
-    const displayWords = words.slice(0, wordIndex + 1).join(' ');
+    // const words = currentSegment.text.split(' ');
+    // const wordsPerTime = captions.wordsPerTime || 3;
+    // const wordIndex = Math.floor((frame / fps) * wordsPerTime) % words.length;
+    // const displayWords = words.slice(0, wordIndex + 1).join(' ');
 
     return (
       <div
@@ -303,7 +303,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
           lineHeight: 1.2
         }}
       >
-        {displayWords}
+        {currentSegment.text}
       </div>
     );
   };
