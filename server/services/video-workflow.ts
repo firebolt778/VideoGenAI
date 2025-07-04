@@ -272,6 +272,8 @@ export class VideoWorkflowService {
       try {
         const totalDuration = audioSegments.reduce((sum, seg) => sum + (seg.duration || 0), 0) / 1000; // Convert to seconds
         
+        console.log(`Generating background music for ${totalDuration}s duration`);
+        
         const music = await backgroundMusicService.generateMusic({
           prompt: template.backgroundMusicPrompt,
           duration: Math.ceil(totalDuration),
@@ -280,12 +282,19 @@ export class VideoWorkflowService {
           volume: template.musicVolume || 30
         });
 
+        console.log(`Background music generated: ${music.filename}`);
+
         // Mix background music with audio segments
         for (let i = 0; i < audioSegments.length; i++) {
           const segment = audioSegments[i];
+          const audioFilePath = path.join(process.cwd(), 'uploads', 'audio', segment.filename);
+          const musicFilePath = path.join(process.cwd(), 'uploads', 'music', music.filename);
+          
+          console.log(`Mixing audio segment ${i + 1} with background music`);
+          
           const mixedAudioPath = await backgroundMusicService.mixAudioWithMusic(
-            `uploads/audio/${segment.filename}`,
-            `uploads/music/${music.filename}`,
+            audioFilePath,
+            musicFilePath,
             music.volume
           );
           
@@ -297,7 +306,8 @@ export class VideoWorkflowService {
         }
       } catch (error) {
         console.error('Failed to generate background music:', error);
-        // Continue without background music
+        console.error('Continuing without background music...');
+        // Continue without background music - the audio segments will be used as-is
       }
     }
 

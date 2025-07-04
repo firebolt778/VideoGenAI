@@ -382,15 +382,15 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
       const ffmpeg = await import('fluent-ffmpeg');
       
       return new Promise((resolve, reject) => {
-        ffmpeg.default(videoPath)
-          .screenshots({
-            timestamps: [timeInSeconds],
-            filename: path.basename(outputPath),
-            folder: path.dirname(outputPath),
-            size: '1280x720'
-          })
-          .on('end', () => resolve(outputPath))
-          .on('error', reject);
+              ffmpeg.default(videoPath)
+                .screenshots({
+                  timestamps: [timeInSeconds],
+                  filename: path.basename(outputPath),
+                  folder: path.dirname(outputPath),
+                  size: '1280x720'
+                })
+                .on('end', () => resolve(outputPath))
+                .on('error', reject);
       });
     } catch (error) {
       throw new Error(`Failed to generate thumbnail: ${(error as Error).message}`);
