@@ -75,6 +75,10 @@ export class VideoWorkflowService {
       const audioSegments = await this.generateAudio(template, imageAssignments);
       await this.logProgress(videoId, "audio", 70, `Generated ${audioSegments.length} audio segments`);
 
+      if (audioSegments.length !== imageAssignments.length) {
+        throw new Error("Audio segments and image assignments do not match");
+      }
+
       // Step 8: Render video with Remotion
       const videoConfig = this.buildVideoConfig(title, script, audioSegments, images, template, channel);
       const videoPath = await remotionService.renderVideo(videoConfig, `output/video_${videoId}.mp4`);

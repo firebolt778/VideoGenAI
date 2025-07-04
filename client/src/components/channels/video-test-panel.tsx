@@ -28,6 +28,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
   const [testProgress, setTestProgress] = useState<TestProgress | null>(null);
   const [currentVideoId, setCurrentVideoId] = useState<number | null>(null);
   const [isVideoPreviewOpen, setIsVideoPreviewOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const { data: templates } = useQuery<VideoTemplate[]>({
     queryKey: ['/api/video-templates'],
@@ -70,6 +71,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
         
         if (progress.progress >= 100 || progress.error) {
           clearInterval(interval);
+          setIsGenerating(false);
           if (progress.error) {
             toast({ title: "Test generation failed", variant: "destructive" });
           } else {
@@ -80,6 +82,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
       } catch (error) {
         console.error('Error polling progress:', error);
         clearInterval(interval);
+        setIsGenerating(false);
       }
     }, 2000);
   };
@@ -90,6 +93,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
       return;
     }
     
+    setIsGenerating(true);
     generateTestVideoMutation.mutate({
       channelId: channel.id,
       templateId: selectedTemplate
@@ -215,14 +219,14 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
         <div className="flex items-center gap-3">
           <Button
             onClick={handleGenerateTest}
-            disabled={!selectedTemplate || generateTestVideoMutation.isPending || !!(testProgress?.progress && testProgress.progress < 100)}
+            disabled={!selectedTemplate || isGenerating || !!(testProgress?.progress && testProgress.progress < 100)}
             className="flex items-center gap-2"
           >
             <Play className="h-4 w-4" />
-            {generateTestVideoMutation.isPending ? "Generating..." : "Generate Test Video"}
+            {isGenerating ? "Generating..." : testProgress?.progress === 100 ? "Generate Again" : "Generate Test Video"}
           </Button>
           
-          {testProgress?.progress === 100 && (
+          {testProgress?.progress === 100 && !isGenerating && (
             <>
               <Button variant="outline" size="sm" onClick={handlePreviewVideo}>
                 <Eye className="h-4 w-4 mr-2" />

@@ -74,10 +74,11 @@ export class RemotionService {
       }
 
       const assetBaseUrl = process.env.ASSET_BASE_URL || "http://127.0.0.1:5000/";
-      const len = config.images.length;
-      for (let i = 0; i < len; i++) {
+      for (let i = 0; i < config.images.length; i++) {
         config.images[i].filename =
           `${assetBaseUrl}uploads/images/${config.images[i].filename}`;
+      }
+      for (let i = 0; i < config.audioSegments.length; i++) {
         config.audioSegments[i].filename =
           `${assetBaseUrl}uploads/audio/${config.audioSegments[i].filename}`;
       }
