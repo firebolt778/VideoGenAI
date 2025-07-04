@@ -285,6 +285,7 @@ export class VideoWorkflowService {
         console.log(`Background music generated: ${music.filename}`);
 
         // Mix background music with audio segments
+        let mixingSuccess = true;
         for (let i = 0; i < audioSegments.length; i++) {
           const segment = audioSegments[i];
           const audioFilePath = path.join(process.cwd(), 'uploads', 'audio', segment.filename);
@@ -292,18 +293,29 @@ export class VideoWorkflowService {
           
           console.log(`Mixing audio segment ${i + 1} with background music`);
           
-          const mixedAudioPath = await backgroundMusicService.mixAudioWithMusic(
-            audioFilePath,
-            musicFilePath,
-            music.volume
-          );
-          
-          // Update segment filename to point to mixed audio
-          audioSegments[i] = {
-            ...segment,
-            filename: path.basename(mixedAudioPath)
-          };
+          try {
+            const mixedAudioPath = await backgroundMusicService.mixAudioWithMusic(
+              audioFilePath,
+              musicFilePath,
+              music.volume
+            );
+            
+            // Update segment filename to point to mixed audio
+            audioSegments[i] = {
+              ...segment,
+              filename: path.basename(mixedAudioPath)
+            };
+          } catch (mixingError) {
+            console.error(`Failed to mix segment ${i + 1}:`, mixingError);
+            mixingSuccess = false;
+            break;
+          }
         }
+        
+        if (!mixingSuccess) {
+          console.log('Some segments failed to mix, continuing with original audio');
+        }
+        
       } catch (error) {
         console.error('Failed to generate background music:', error);
         console.error('Continuing without background music...');
