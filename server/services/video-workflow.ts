@@ -32,7 +32,7 @@ export class VideoWorkflowService {
 
       // Step 1: Select and process idea
       const selectedIdea = this.selectIdea(template);
-      await this.logProgress(videoId, "idea_selection", 10, `Selected idea: ${selectedIdea.substring(0, 50)}...`);
+      await this.logProgress(videoId, "idea_selection", 10, `Selected idea: ${selectedIdea.substring(0, 80)}...`);
 
       // Step 2: Generate story outline
       const context: ShortcodeContext = {

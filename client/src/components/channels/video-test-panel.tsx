@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -25,10 +25,30 @@ interface TestProgress {
 export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
   const { toast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
+  const [logs, setLogs] = useState<TestProgress[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [testProgress, setTestProgress] = useState<TestProgress | null>(null);
   const [currentVideoId, setCurrentVideoId] = useState<number | null>(null);
   const [isVideoPreviewOpen, setIsVideoPreviewOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const consoleRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!testProgress) return;
+    const lastLog = logs[logs.length - 1];
+    if (!lastLog || lastLog.progress !== testProgress.progress) {
+      setLogs(prev => [...prev, testProgress]);
+    }
+  }, [testProgress, logs]);
+  useEffect(() => {
+    if (consoleRef.current) {
+      consoleRef.current?.scrollTo({
+        top: consoleRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [logs, consoleRef.current]);
 
   const { data: templates } = useQuery<VideoTemplate[]>({
     queryKey: ['/api/video-templates'],
@@ -68,11 +88,12 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
         const response = await apiRequest("GET", `/api/videos/${videoId}/progress`);
         const progress: TestProgress & { error?: string } = await response.json();
         setTestProgress(progress);
-        
+
         if (progress.progress >= 100 || progress.error) {
           clearInterval(interval);
           setIsGenerating(false);
           if (progress.error) {
+            setError(progress.error);
             toast({ title: "Test generation failed", variant: "destructive" });
           } else {
             setCurrentVideoId(videoId);
@@ -87,12 +108,30 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
     }, 2000);
   };
 
+  const getNextStepMessage = (stage: string) => {
+    const labels: Record<string, string> = {
+      "initialization": "Initializing ...",
+      "idea_selection": "Creating Outline ...",
+      "outline": "Writing Script ...",
+      "script": "Generating Hook ...",
+      "hook": "Creating Images ...",
+      "images": "Assigning Images ...",
+      "image_assignment": "Generating Audio ...",
+      "audio": "Rendering Video ...",
+      "rendering": "Creating Thumbnail ...",
+      "thumbnail": "Finalizing ...",
+      "complete": "Completed"
+    };
+    return labels[stage] || stage;
+  }
+
   const handleGenerateTest = () => {
     if (!selectedTemplate) {
       toast({ title: "Please select a template", variant: "destructive" });
       return;
     }
-    
+    setTestProgress(null);
+    setLogs([]);
     setIsGenerating(true);
     generateTestVideoMutation.mutate({
       channelId: channel.id,
@@ -113,7 +152,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     toast({ title: "Download started" });
   };
 
@@ -170,8 +209,8 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
         {/* Template Selection */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Select Template</label>
-          <Select 
-            value={selectedTemplate?.toString() || ""} 
+          <Select
+            value={selectedTemplate?.toString() || ""}
             onValueChange={(value) => setSelectedTemplate(parseInt(value))}
           >
             <SelectTrigger>
@@ -193,24 +232,24 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
         </div>
 
         {/* Progress Display */}
-        {testProgress && (
+        {isGenerating && (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {getStageIcon(testProgress.stage)}
-                  <span className="text-sm font-medium">
-                    {getStageLabel(testProgress.stage)}
-                  </span>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {testProgress.progress}%
-                </span>
+            <Progress value={testProgress?.progress || 0} className="h-2" />
+            <div
+              className="space-y-2 bg-gray-800 text-white rounded-lg p-4 max-h-36 overflow-auto"
+              ref={consoleRef}
+            >
+              {logs.map((log, index) => (
+                <div key={index}>{log.message}</div>
+              ))}
+              <div className="flex items-center gap-2">
+                {getStageIcon(testProgress?.stage || "initialization")}
+                <span>{testProgress?.progress || 0}%</span>
+                <span>{getNextStepMessage(testProgress?.stage || "initialization")}</span>
               </div>
-              <Progress value={testProgress.progress} className="h-2" />
-              <p className="text-sm text-muted-foreground">
-                {testProgress.message}
-              </p>
+              {!!error && (
+                <div className="text-red-400">{error}</div>
+              )}
             </div>
           </div>
         )}
@@ -225,7 +264,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
             <Play className="h-4 w-4" />
             {isGenerating ? "Generating..." : testProgress?.progress === 100 ? "Generate Again" : "Generate Test Video"}
           </Button>
-          
+
           {testProgress?.progress === 100 && !isGenerating && (
             <>
               <Button variant="outline" size="sm" onClick={handlePreviewVideo}>
@@ -244,7 +283,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Test videos are generated locally and won't be published to YouTube. 
+            Test videos are generated locally and won't be published to YouTube.
             This allows you to verify your template settings without consuming ideas or affecting your channel.
           </AlertDescription>
         </Alert>
