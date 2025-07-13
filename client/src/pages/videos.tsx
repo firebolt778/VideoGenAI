@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,8 @@ import {
 } from "lucide-react";
 import VideoPreview from "@/components/video-preview";
 import type { Video, Channel, VideoTemplate } from "@shared/schema";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 
 interface VideoWithDetails extends Video {
   channel?: Channel;
@@ -47,10 +50,14 @@ interface VideoWithDetails extends Video {
 }
 
 export default function Videos() {
+  const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [channelFilter, setChannelFilter] = useState<string>("all");
   const [selectedVideo, setSelectedVideo] = useState<VideoWithDetails | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleVideo, setScheduleVideo] = useState<VideoWithDetails | null>(null);
+  const [scheduledAt, setScheduledAt] = useState<string>("");
 
   const { data: videos, isLoading, refetch } = useQuery<VideoWithDetails[]>({
     queryKey: ['/api/videos'],
@@ -143,6 +150,27 @@ export default function Videos() {
       minute: '2-digit'
     });
   };
+
+  const scheduleMutation = useMutation({
+    mutationFn: async ({ videoId, scheduledAt }: { videoId: number; scheduledAt: string }) => {
+      const res = await fetch(`/api/videos/${videoId}/schedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduledAt }),
+      });
+      if (!res.ok) throw new Error("Failed to schedule video");
+      return res.json();
+    },
+    onSuccess: () => {
+      setScheduleModalOpen(false);
+      setScheduleVideo(null);
+      setScheduledAt("");
+      refetch();
+    },
+    onError: () => {
+      toast({ title: "Failed to schedule video", variant: "destructive" });
+    },
+  });
 
   if (isLoading) {
     return (
@@ -253,6 +281,7 @@ export default function Videos() {
                       <TableHead>Template</TableHead>
                       <TableHead>Duration</TableHead>
                       <TableHead>Created</TableHead>
+                      <TableHead>Scheduled</TableHead>
                       <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -286,6 +315,9 @@ export default function Videos() {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {formatDate(video.createdAt.toString())}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {video.scheduledAt ? formatDate(video.scheduledAt.toString()) : <span className="text-muted-foreground">Not scheduled</span>}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end space-x-2">
@@ -322,6 +354,19 @@ export default function Videos() {
                                 <Download className="h-4 w-4" />
                               </Button>
                             )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              title="Schedule Publish"
+                              onClick={() => {
+                                setScheduleVideo(video);
+                                setScheduledAt(video.scheduledAt ? video.scheduledAt.toISOString().slice(0, 16) : "");
+                                setScheduleModalOpen(true);
+                              }}
+                            >
+                              <Calendar className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -345,6 +390,35 @@ export default function Videos() {
           }}
         />
       )}
+
+      <Dialog open={scheduleModalOpen} onOpenChange={setScheduleModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule Video Publish</DialogTitle>
+            <DialogDescription>
+              Select a date and time to schedule this video for YouTube publication.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={e => setScheduledAt(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+            />
+            <Button
+              onClick={() => {
+                if (scheduleVideo && scheduledAt) {
+                  scheduleMutation.mutate({ videoId: scheduleVideo.id, scheduledAt });
+                }
+              }}
+              disabled={!scheduledAt || scheduleMutation.isPending}
+            >
+              {scheduleMutation.isPending ? "Scheduling..." : "Schedule"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 } 

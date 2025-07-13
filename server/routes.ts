@@ -743,6 +743,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/videos/:id/schedule", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { scheduledAt } = req.body;
+      if (!scheduledAt) {
+        return res.status(400).json({ message: "scheduledAt is required" });
+      }
+      const video = await storage.updateVideo(id, { scheduledAt: new Date(scheduledAt) });
+      if (!video) {
+        return res.status(404).json({ message: "Video not found" });
+      }
+      res.json(video);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to schedule video" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
