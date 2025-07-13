@@ -410,17 +410,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Video generation endpoint
   app.post("/api/generate-video", async (req, res) => {
     try {
-      const { channelId, templateId, testMode = false } = req.body;
+      const { channelId, templateId, thumbnailTemplateId, testMode = false } = req.body;
       
-      if (!channelId || !templateId) {
-        return res.status(400).json({ message: "Channel ID and Template ID are required" });
+      if (!channelId || !templateId || !thumbnailTemplateId) {
+        return res.status(400).json({ message: "Channel ID, Template ID and Thumbnail Template ID are required" });
       }
 
       const channel = await storage.getChannel(channelId);
       const template = await storage.getVideoTemplate(templateId);
+      const thumbnailTemplate = await storage.getThumbnailTemplate(thumbnailTemplateId);
       
-      if (!channel || !template) {
-        return res.status(404).json({ message: "Channel or template not found" });
+      if (!channel || !template || !thumbnailTemplate) {
+        return res.status(404).json({ message: "Channel, template or thumbnail template not found" });
       }
 
       // Create video record
@@ -437,7 +438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Start generation in background
       setImmediate(async () => {
         try {
-          await videoWorkflowService.generateVideo(video.id, channelId, template, testMode);
+          await videoWorkflowService.generateVideo(video.id, channelId, template, thumbnailTemplate, testMode);
         } catch (err) {
           console.error('Video generation error:', err);
           throw err;

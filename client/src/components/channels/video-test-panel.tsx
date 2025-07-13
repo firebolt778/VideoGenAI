@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TestTube, Play, Download, Eye, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Channel, VideoTemplate } from "@shared/schema";
+import type { Channel, ThumbnailTemplate, VideoTemplate } from "@shared/schema";
 
 interface VideoTestPanelProps {
   channel: Channel;
@@ -25,13 +25,13 @@ interface TestProgress {
 export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
   const { toast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
+  const [selectedThumbnailTemplate, setSelectedThumbnailTemplate] = useState<number | null>(null);
   const [logs, setLogs] = useState<TestProgress[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [testProgress, setTestProgress] = useState<TestProgress | null>(null);
   const [currentVideoId, setCurrentVideoId] = useState<number | null>(null);
   const [isVideoPreviewOpen, setIsVideoPreviewOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-
   const consoleRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -54,6 +54,10 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
     queryKey: ['/api/video-templates'],
   });
 
+  const { data: thumbnailTemplates } = useQuery<ThumbnailTemplate[]>({
+    queryKey: ['/api/thumbnail-templates'],
+  });
+
   const { data: currentVideo } = useQuery({
     queryKey: ['/api/videos', currentVideoId],
     queryFn: async () => {
@@ -65,10 +69,11 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
   });
 
   const generateTestVideoMutation = useMutation({
-    mutationFn: async ({ channelId, templateId }: { channelId: number; templateId: number }) => {
+    mutationFn: async ({ channelId, templateId, thumbnailTemplateId }: { channelId: number; templateId: number, thumbnailTemplateId: number }) => {
       const response = await apiRequest("POST", "/api/generate-video", {
         channelId,
         templateId,
+        thumbnailTemplateId,
         testMode: true
       });
       return response;
@@ -130,12 +135,17 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
       toast({ title: "Please select a template", variant: "destructive" });
       return;
     }
+    if (!selectedThumbnailTemplate) {
+      toast({ title: "Please select a thumbnail template", variant: "destructive" });
+      return;
+    }
     setTestProgress(null);
     setLogs([]);
     setIsGenerating(true);
     generateTestVideoMutation.mutate({
       channelId: channel.id,
-      templateId: selectedTemplate
+      templateId: selectedTemplate,
+      thumbnailTemplateId: selectedThumbnailTemplate,
     });
   };
 
@@ -225,6 +235,26 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
                       {template.type}
                     </Badge>
                   </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Thumbnail Template Selection */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Select Thumbnail Template</label>
+          <Select
+            value={selectedThumbnailTemplate?.toString() || ""}
+            onValueChange={(value) => setSelectedThumbnailTemplate(parseInt(value))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Choose a thumbnail template" />
+            </SelectTrigger>
+            <SelectContent>
+              {thumbnailTemplates?.map((template) => (
+                <SelectItem key={template.id} value={template.id.toString()}>
+                  {template.name}
                 </SelectItem>
               ))}
             </SelectContent>

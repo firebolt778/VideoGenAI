@@ -6,7 +6,7 @@ import { youtubeService } from "./youtube";
 import { backgroundMusicService } from "./background-music";
 import { ShortcodeProcessor, type ShortcodeContext } from "./shortcode";
 import { storage } from "../storage";
-import type { Channel, VideoTemplate, Video } from "@shared/schema";
+import type { Channel, VideoTemplate, ThumbnailTemplate } from "@shared/schema";
 import path from "path";
 
 export interface VideoGenerationProgress {
@@ -20,11 +20,11 @@ export interface VideoGenerationProgress {
 export class VideoWorkflowService {
   private progressCallbacks: Map<number, (progress: VideoGenerationProgress) => void> = new Map();
 
-  async generateVideo(videoId: number, channelId: number, template: VideoTemplate, testMode: boolean = false): Promise<void> {
+  async generateVideo(videoId: number, channelId: number, template: VideoTemplate, thumbnailTemplate: ThumbnailTemplate, testMode: boolean = false): Promise<void> {
     const channel = await storage.getChannel(channelId);
   
-    if (!channel || !template) {
-      throw new Error("Channel or template not found");
+    if (!channel || !template || !thumbnailTemplate) {
+      throw new Error("Channel, template or thumbnail template not found");
     }
 
     try {
@@ -75,17 +75,13 @@ export class VideoWorkflowService {
       const audioSegments = await this.generateAudio(template, imageAssignments);
       await this.logProgress(videoId, "audio", 70, `Generated ${audioSegments.length} audio segments`);
 
-      if (audioSegments.length !== imageAssignments.length) {
-        throw new Error("Audio segments and image assignments do not match");
-      }
-
       // Step 8: Render video with Remotion
       const videoConfig = this.buildVideoConfig(title, script, audioSegments, images, template, channel);
       const videoPath = await remotionService.renderVideo(videoConfig, `output/video_${videoId}.mp4`);
       await this.logProgress(videoId, "rendering", 85, "Video rendering completed");
 
       // Step 9: Generate thumbnail
-      const thumbnailPath = await this.generateThumbnail(videoId, title, script, channel);
+      const thumbnailPath = await this.generateThumbnail(videoId, title, script, channel, images, thumbnailTemplate);
       await this.logProgress(videoId, "thumbnail", 90, "Generated thumbnail");
 
       // Step 10: Upload to YouTube (if not test mode)
@@ -203,7 +199,7 @@ export class VideoWorkflowService {
     for (let i = 0; i < imagePrompts.length; i++) {
       const imagePrompt = imagePrompts[i];
       try {
-        const image = await fluxService.generateImageWithFallback(imagePrompt.description);
+        const image = await fluxService.generateImageWithFallback(imagePrompt.description, images[i - 1]?.url);
         images.push({
           ...image,
           index: i + 1,
@@ -376,18 +372,84 @@ export class VideoWorkflowService {
     };
   }
 
-  private async generateThumbnail(videoId: number, title: string, script: string, channel: Channel): Promise<string> {
+  // --- UPDATED: Accept images and thumbnailTemplate, support granular fallback ---
+  private async generateThumbnail(
+    videoId: number,
+    title: string,
+    script: string,
+    channel: Channel,
+    images: any[],
+    thumbnailTemplate?: any
+  ): Promise<string> {
+    // Helper to fallback to a video frame at a specific time
+    const fallbackToVideoFrame = async (position: 'first' | 'last' | 'random' = 'first') => {
+      const videoPath = `output/video_${videoId}.mp4`;
+      const outputPath = `thumbnails/thumbnail_${videoId}.jpg`;
+      let timeInSeconds = 5; // default
+      try {
+        // Try to get video duration if possible
+        const ffmpeg = await import('fluent-ffmpeg');
+        const getDuration = () => new Promise<number>((resolve, reject) => {
+          ffmpeg.default(videoPath).ffprobe((err, metadata) => {
+            if (err) return resolve(10); // fallback
+            resolve(metadata.format.duration || 10);
+          });
+        });
+        const duration = await getDuration();
+        if (position === 'first') timeInSeconds = 0.5;
+        else if (position === 'last') timeInSeconds = Math.max(duration - 1, 0.5);
+        else if (position === 'random') timeInSeconds = Math.max(Math.random() * (duration - 1), 0.5);
+      } catch {}
+      return await remotionService.generateThumbnail(videoPath, outputPath, timeInSeconds);
+    };
+
+    // Helper to fallback to a generated image
+    const fallbackToGeneratedImage = async (which: 'first' | 'last' | 'random') => {
+      if (!images || images.length === 0) return undefined;
+      let selected;
+      if (which === 'first') selected = images[0];
+      else if (which === 'last') selected = images[images.length - 1];
+      else if (which === 'random') selected = images[Math.floor(Math.random() * images.length)];
+      // Copy image to thumbnails folder
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const srcPath = path.join(process.cwd(), 'uploads', 'images', selected.filename);
+      const destDir = path.join(process.cwd(), 'thumbnails');
+      await fs.mkdir(destDir, { recursive: true });
+      const destPath = path.join(destDir, `thumbnail_${videoId}.jpg`);
+      await fs.copyFile(srcPath, destPath);
+      return `thumbnails/thumbnail_${videoId}.jpg`;
+    };
+
+    // --- Main logic ---
+    const type = thumbnailTemplate?.type || 'ai-generated';
+    const fallbackStrategy = thumbnailTemplate?.fallbackStrategy || 'first-image';
     try {
-      const thumbnailPrompt = await openaiService.generateThumbnailPrompt(title, script);
-      const thumbnail = await fluxService.generateImageWithFallback(thumbnailPrompt);
-      return thumbnail.filename;
+      if (type === 'ai-generated') {
+        try {
+          const thumbnailPrompt = await openaiService.generateThumbnailPrompt(title, script);
+          const thumbnail = await fluxService.generateImageWithFallback(thumbnailPrompt);
+          return thumbnail.filename;
+        } catch (error) {
+          console.error("Failed to generate AI thumbnail, using fallback strategy:", error);
+          // Fallback below
+        }
+      }
+      // If not ai-generated, or fallback from AI
+      if (type === 'first-image' || (type === 'ai-generated' && fallbackStrategy === 'first-image')) {
+        // Try generated image first, else video frame
+        return (await fallbackToGeneratedImage('first')) || (await fallbackToVideoFrame('first'));
+      } else if (type === 'last-image' || (type === 'ai-generated' && fallbackStrategy === 'last-image')) {
+        return (await fallbackToGeneratedImage('last')) || (await fallbackToVideoFrame('last'));
+      } else if (type === 'random-image' || (type === 'ai-generated' && fallbackStrategy === 'random-image')) {
+        return (await fallbackToGeneratedImage('random')) || (await fallbackToVideoFrame('random'));
+      } else {
+        // Default fallback: video frame at 5s
+        return await fallbackToVideoFrame('first');
+      }
     } catch (error) {
-      console.error("Failed to generate AI thumbnail, using video frame:", error);
-      // Fallback to video frame
-      return await remotionService.generateThumbnail(
-        `output/video_${videoId}.mp4`,
-        `thumbnails/thumbnail_${videoId}.jpg`
-      );
+      console.error("All thumbnail generation methods failed, using video frame:", error);
+      return await fallbackToVideoFrame('first');
     }
   }
 

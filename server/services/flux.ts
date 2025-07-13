@@ -9,6 +9,7 @@ export interface FluxImageOptions {
   guidance_scale?: number;
   scheduler?: string;
   seed?: number;
+  image?: string;
 }
 
 export interface GeneratedImage {
@@ -154,9 +155,9 @@ export class FluxService {
   }
 
   // Fallback to DALL-E 3 if Flux fails
-  async generateImageWithFallback(prompt: string): Promise<GeneratedImage> {
+  async generateImageWithFallback(prompt: string, image?: string): Promise<GeneratedImage> {
     try {
-      return await this.generateImage({ prompt });
+      return await this.generateImage({ prompt, image });
     } catch (fluxError) {
       console.log('Flux generation failed, falling back to DALL-E 3:', (fluxError as Error).message);
 

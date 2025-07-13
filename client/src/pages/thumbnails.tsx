@@ -289,14 +289,6 @@ export default function Thumbnails() {
                               variant="ghost"
                               size="sm"
                               className="h-8 w-8 p-0"
-                              title="Test Template"
-                            >
-                              <TestTube className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
                               title="Edit Template"
                               onClick={() => handleEditTemplate(template)}
                             >
