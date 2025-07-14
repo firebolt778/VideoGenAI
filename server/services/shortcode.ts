@@ -8,6 +8,9 @@ export interface ShortcodeContext {
   channelName?: string;
   channelDescription?: string;
   imageCount?: number;
+  // --- Added for character/environment consistency ---
+  mainCharacter?: string;
+  environment?: string;
 }
 
 export class ShortcodeProcessor {

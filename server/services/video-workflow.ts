@@ -62,7 +62,7 @@ export class VideoWorkflowService {
         selectedIdea,
         channelName: channel.name,
         channelDescription: channel.description || "",
-        imageCount: template.imageCount || 8,
+        imageCount: template.imageCount || 8
       };
 
       const outline = await this.handleErrorWithRetry(
@@ -190,7 +190,9 @@ export class VideoWorkflowService {
       raw: JSON.stringify(response),
       title: response.title,
       chapters: response.chapters,
-      summary: response.summary
+      summary: response.summary,
+      mainCharacter: response.mainCharacter,
+      environment: response.environment
     };
   }
 
@@ -220,7 +222,12 @@ export class VideoWorkflowService {
     }
 
     const prompt = ShortcodeProcessor.process(template.imagePrompt, context);
-    const imagePrompts = await openaiService.generateImagePrompts(context.script!, context.imageCount || 8, prompt);
+    const imagePrompts = await openaiService.generateImagePrompts(
+      context.script!,
+      context.imageCount || 8,
+      prompt,
+      { mainCharacter: context.mainCharacter, environment: context.environment }
+    );
     
     const images = [];
     for (let i = 0; i < imagePrompts.length; i++) {

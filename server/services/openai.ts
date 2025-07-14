@@ -12,6 +12,8 @@ export interface StoryOutline {
     description: string;
   }>;
   summary: string;
+  mainCharacter?: string;
+  environment?: string;
 }
 
 export interface ImagePrompt {
@@ -41,7 +43,9 @@ Respond with JSON in this exact format:
   "chapters": [
     {"name": "Chapter name", "description": "Chapter description"}
   ],
-  "summary": "Brief story summary"
+  "summary": "Brief story summary",
+  "mainCharacter": "Main character description",
+  "environment": "Environment description"
 }`;
 
     try {
@@ -118,20 +122,25 @@ Enclose the script content between --- markers like this:
     }
   }
 
-  async generateImagePrompts(script: string, numImages: number, customPrompt?: string): Promise<ImagePrompt[]> {
+  async generateImagePrompts(script: string, numImages: number, customPrompt?: string, context?: { mainCharacter?: string, environment?: string }): Promise<ImagePrompt[]> {
     let prompt = customPrompt || `
 Analyze this script and generate ${numImages} detailed image prompts that would visually represent key scenes:
 
 Script:
 \`\`\`
 ${script}
-\`\`\`
+\`\`\``;
+    prompt += `
 
 For each image, create a detailed description that includes:
 - Main subject/scene
 - Artistic style (cinematic, dramatic, ethereal, etc.)
 - Mood and atmosphere
 - Lighting and color palette`;
+    // --- Add character/environment consistency ---
+    if (context?.mainCharacter && context?.environment) {
+      prompt += `\n\nIMPORTANT: Every image must feature the same main character: ${context.mainCharacter}, and the same environment: ${context.environment}.`;
+    }
     prompt += `
 Respond with JSON in this exact format:
 {
