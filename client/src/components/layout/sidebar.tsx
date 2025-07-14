@@ -9,7 +9,8 @@ import {
   BarChart3, 
   User,
   Settings as SettingsIcon,
-  Play
+  Play,
+  TestTube
 } from "lucide-react";
 
 const navigation = [
@@ -19,6 +20,7 @@ const navigation = [
   { name: 'Videos', href: '/videos', icon: Play },
   { name: 'Thumbnails', href: '/thumbnails', icon: Image },
   { name: 'Hooks', href: '/hooks', icon: PlayCircle },
+  { name: 'QA Dashboard', href: '/qa', icon: TestTube },
   { name: 'Logs & Debug', href: '/logs', icon: ListChecks },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: SettingsIcon },

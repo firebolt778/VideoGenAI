@@ -416,6 +416,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Channel ID, Template ID and Thumbnail Template ID are required" });
       }
 
+      // Enhanced validation
+      const { validationService } = await import("./services/validation");
+      const validationResult = await validationService.validateVideoGenerationInput(
+        channelId,
+        templateId,
+        thumbnailTemplateId,
+        testMode
+      );
+
+      if (!validationResult.isValid) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: validationResult.errors,
+          warnings: validationResult.warnings,
+          suggestions: validationResult.suggestions
+        });
+      }
+
       const channel = await storage.getChannel(channelId);
       const template = await storage.getVideoTemplate(templateId);
       const thumbnailTemplate = await storage.getThumbnailTemplate(thumbnailTemplateId);
@@ -448,7 +466,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         videoId: video.id,
-        message: testMode ? "Test video generation started" : "Video queued for generation"
+        message: testMode ? "Test video generation started" : "Video queued for generation",
+        warnings: validationResult.warnings,
+        suggestions: validationResult.suggestions
       });
     } catch (error) {
       const e = error as Error;
@@ -584,6 +604,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Video preview error:', error);
       res.status(500).json({ message: "Failed to preview video" });
+    }
+  });
+
+  // Testing endpoints
+  app.post("/api/tests/run", async (req, res) => {
+    try {
+      const { testSuite } = req.body;
+      const { testingService } = await import("./services/testing");
+      
+      let results;
+      if (testSuite) {
+        results = await testingService.runTestSuite(testSuite);
+      } else {
+        results = await testingService.runAllTests();
+      }
+      
+      res.json({
+        success: true,
+        results,
+        summary: {
+          total: results.length,
+          passed: results.filter(r => r.passed).length,
+          failed: results.filter(r => !r.passed).length,
+          successRate: (results.filter(r => r.passed).length / results.length) * 100
+        }
+      });
+    } catch (error) {
+      const e = error as Error;
+      console.error('Test execution error:', e);
+      res.status(500).json({ message: `Failed to run tests: ${e.message}` });
+    }
+  });
+
+  app.get("/api/tests/statistics", async (req, res) => {
+    try {
+      const { testingService } = await import("./services/testing");
+      const stats = await testingService.getTestStatistics();
+      res.json(stats);
+    } catch (error) {
+      const e = error as Error;
+      console.error('Test statistics error:', e);
+      res.status(500).json({ message: `Failed to get test statistics: ${e.message}` });
+    }
+  });
+
+  // Validation endpoints
+  app.post("/api/validate/template", async (req, res) => {
+    try {
+      const { templateId } = req.body;
+      const { validationService } = await import("./services/validation");
+      
+      const template = await storage.getVideoTemplate(templateId);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+
+      const validationResult = await validationService.validateVideoGenerationInput(
+        1, // dummy channel ID
+        templateId,
+        1, // dummy thumbnail template ID
+        true // test mode
+      );
+
+      res.json({
+        success: true,
+        validation: validationResult
+      });
+    } catch (error) {
+      const e = error as Error;
+      console.error('Template validation error:', e);
+      res.status(500).json({ message: `Failed to validate template: ${e.message}` });
+    }
+  });
+
+  // Error statistics endpoint
+  app.get("/api/errors/statistics", async (req, res) => {
+    try {
+      const { errorHandlerService } = await import("./services/error-handler");
+      const stats = await errorHandlerService.getErrorStatistics();
+      res.json(stats);
+    } catch (error) {
+      const e = error as Error;
+      console.error('Error statistics error:', e);
+      res.status(500).json({ message: `Failed to get error statistics: ${e.message}` });
     }
   });
 

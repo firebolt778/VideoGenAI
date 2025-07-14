@@ -6,7 +6,10 @@ import { youtubeService } from "./youtube";
 import { backgroundMusicService } from "./background-music";
 import { ShortcodeProcessor, type ShortcodeContext } from "./shortcode";
 import { storage } from "../storage";
+import { validationService } from "./validation";
+import { errorHandlerService } from "./error-handler";
 import type { Channel, VideoTemplate, ThumbnailTemplate } from "@shared/schema";
+import type { ErrorContext } from "./error-handler";
 import path from "path";
 
 export interface VideoGenerationProgress {
@@ -21,6 +24,22 @@ export class VideoWorkflowService {
   private progressCallbacks: Map<number, (progress: VideoGenerationProgress) => void> = new Map();
 
   async generateVideo(videoId: number, channelId: number, template: VideoTemplate, thumbnailTemplate: ThumbnailTemplate, testMode: boolean = false): Promise<void> {
+    // Pre-validation
+    const validationResult = await validationService.validateVideoGenerationInput(
+      channelId,
+      template.id,
+      thumbnailTemplate.id,
+      testMode
+    );
+
+    if (!validationResult.isValid) {
+      throw new Error(`Validation failed: ${validationResult.errors.join(", ")}`);
+    }
+
+    if (validationResult.warnings.length > 0) {
+      await this.logProgress(videoId, "validation", 5, `Validation warnings: ${validationResult.warnings.join(", ")}`);
+    }
+
     const channel = await storage.getChannel(channelId);
   
     if (!channel || !template || !thumbnailTemplate) {
@@ -31,7 +50,11 @@ export class VideoWorkflowService {
       await this.logProgress(videoId, "initialization", 0, "Starting video generation workflow");
 
       // Step 1: Select and process idea
-      const selectedIdea = this.selectIdea(template);
+      const selectedIdea = await this.handleErrorWithRetry(
+        () => this.selectIdea(template),
+        { videoId, stage: "idea_selection", channelId, templateId: template.id, testMode, retryCount: 0, maxRetries: 3, error: new Error("Initial error"), timestamp: new Date() },
+        "openai"
+      ) as string;
       await this.logProgress(videoId, "idea_selection", 10, `Selected idea: ${selectedIdea.substring(0, 80)}...`);
 
       // Step 2: Generate story outline
@@ -42,7 +65,11 @@ export class VideoWorkflowService {
         imageCount: template.imageCount || 8,
       };
 
-      const outline = await this.generateOutline(template, context);
+      const outline = await this.handleErrorWithRetry(
+        () => this.generateOutline(template, context),
+        { videoId, stage: "outline", channelId, templateId: template.id, testMode, retryCount: 0, maxRetries: 3, error: new Error("Initial error"), timestamp: new Date() },
+        "openai"
+      );
       context.outline = outline.raw;
       
       const title = outline.title || `${channel.name} Story`;
@@ -140,7 +167,7 @@ export class VideoWorkflowService {
     }
   }
 
-  private selectIdea(template: VideoTemplate): string {
+  private async selectIdea(template: VideoTemplate): Promise<string> {
     if (!template.ideasList) {
       throw new Error("No ideas list configured for template");
     }
@@ -496,6 +523,25 @@ export class VideoWorkflowService {
 
   offProgress(videoId: number) {
     this.progressCallbacks.delete(videoId);
+  }
+
+  // Enhanced error handling with retry logic
+  private async handleErrorWithRetry<T>(
+    operation: () => Promise<T>,
+    context: ErrorContext,
+    service: string
+  ): Promise<T> {
+    return errorHandlerService.handleErrorWithRetry(operation, context, service);
+  }
+
+  // Handle content generation with quality checks
+  private async handleContentGeneration<T>(
+    operation: () => Promise<T>,
+    qualityCheck: (result: T) => Promise<boolean>,
+    context: ErrorContext,
+    service: string
+  ): Promise<T> {
+    return errorHandlerService.handleContentGeneration(operation, qualityCheck, context, service);
   }
 }
 

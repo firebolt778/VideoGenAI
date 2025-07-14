@@ -8,6 +8,7 @@ import VideoTemplates from "@/pages/video-templates";
 import Videos from "@/pages/videos";
 import Thumbnails from "@/pages/thumbnails";
 import Hooks from "@/pages/hooks";
+import QA from "@/pages/qa";
 import Logs from "@/pages/logs";
 import Analytics from "@/pages/analytics";
 import NotFound from "@/pages/not-found";
@@ -27,6 +28,7 @@ function Router() {
           <Route path="/videos" component={Videos} />
           <Route path="/thumbnails" component={Thumbnails} />
           <Route path="/hooks" component={Hooks} />
+          <Route path="/qa" component={QA} />
           <Route path="/logs" component={Logs} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/settings" component={Settings} />
