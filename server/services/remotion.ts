@@ -16,6 +16,7 @@ export interface RemotionVideoConfig {
     description: string;
     scriptSegment: string;
   }>;
+  bgAudio?: string;
   watermark?: {
     url: string;
     position: string;
@@ -35,7 +36,6 @@ export interface RemotionVideoConfig {
     font: string;
     color: string;
     position: string;
-    wordsPerTime: number;
   };
   transitions?: {
     type: string;
@@ -86,6 +86,9 @@ export class RemotionService {
         config.watermark.url = config.watermark.url.startsWith('http')
           ? config.watermark.url
           : `${assetBaseUrl}${config.watermark.url}`;
+      }
+      if (config.bgAudio) {
+        config.bgAudio = `${assetBaseUrl}uploads/music/${config.bgAudio}`;
       }
 
       const composition = await selectComposition({
@@ -168,6 +171,7 @@ interface StoryVideoProps {
     description: string;
     scriptSegment: string;
   }>;
+  bgAudio?: string;
   watermark?: {
     url: string;
     position: string;
@@ -200,6 +204,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   script,
   audioSegments,
   images,
+  bgAudio,
   watermark,
   effects,
   captions,
@@ -270,28 +275,48 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     );
   };
 
+  const getCaptionChunks = (text: string, maxWordsPerChunk = 10) => {
+    // Split text into words and group into chunks of maxWordsPerChunk
+    const words = text.split(' ');
+    const chunks = [];
+    for (let i = 0; i < words.length; i += maxWordsPerChunk) {
+      chunks.push(words.slice(i, i + maxWordsPerChunk).join(' '));
+    }
+    return chunks;
+  };
+
   const renderCaptions = () => {
     if (!captions?.enabled) return null;
 
     const currentSegmentIndex = audioSegments.findIndex((_, index) => {
       const segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
       const segmentEnd = segmentStart + audioSegments[index]?.duration;
-      return frame >= segmentStart / 1000 * fps && frame < segmentEnd / 1000 * fps;
+      return frame >= (segmentStart / 1000) * fps && frame < (segmentEnd / 1000) * fps;
     });
 
     if (currentSegmentIndex === -1) return null;
 
     const currentSegment = audioSegments[currentSegmentIndex];
-    // const words = currentSegment.text.split(' ');
-    // const wordsPerTime = captions.wordsPerTime || 3;
-    // const wordIndex = Math.floor((frame / fps) * wordsPerTime) % words.length;
-    // const displayWords = words.slice(0, wordIndex + 1).join(' ');
+    const segmentStart = audioSegments.slice(0, currentSegmentIndex).reduce((sum, seg) => sum + seg.duration, 0);
+    const segmentDuration = currentSegment.duration;
+    const segmentStartFrame = (segmentStart / 1000) * fps;
+    const segmentEndFrame = ((segmentStart + segmentDuration) / 1000) * fps;
+
+    // Split caption into chunks (tweak maxWordsPerChunk as needed for 2 lines)
+    const chunks = getCaptionChunks(currentSegment.text, 10);
+
+    // Calculate which chunk to show based on frame
+    const framesPerChunk = (segmentEndFrame - segmentStartFrame) / chunks.length;
+    const chunkIndex = Math.floor((frame - segmentStartFrame) / framesPerChunk);
+
+    // Clamp chunkIndex to valid range
+    const safeChunkIndex = Math.max(0, Math.min(chunkIndex, chunks.length - 1));
 
     return (
       <div
         style={{
           position: 'absolute',
-          bottom: captions.position === 'bottom' ? '10%' : '50%',
+          bottom: captions.position === 'bottom' ? '10%' : captions.position === 'top' ? '80%' : '45%',
           left: '50%',
           transform: 'translateX(-50%)',
           color: captions.color || '#ffffff',
@@ -301,10 +326,13 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
           textAlign: 'center',
           textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
           maxWidth: '80%',
-          lineHeight: 1.2
+          lineHeight: 1.2,
+          background: 'rgba(0,0,0,0.4)',
+          borderRadius: '12px',
+          padding: '0.2em 0.6em'
         }}
       >
-        {currentSegment.text}
+        {chunks[safeChunkIndex]}
       </div>
     );
   };
@@ -369,6 +397,12 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
           </Sequence>
         );
       })}
+      
+      {!!bgAudio && (
+        <Sequence from={0}>
+          <Audio src={bgAudio} />
+        </Sequence>
+      )}
     </AbsoluteFill>
   );
 };
