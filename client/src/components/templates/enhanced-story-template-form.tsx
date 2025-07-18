@@ -380,6 +380,9 @@ export default function EnhancedStoryTemplateForm({
                             min={5}
                             max={120}
                             {...field}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value))
+                            }
                             value={field.value ?? undefined}
                           />
                         </FormControl>
