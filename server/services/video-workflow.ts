@@ -10,7 +10,6 @@ import { validationService } from "./validation";
 import { errorHandlerService } from "./error-handler";
 import type { Channel, VideoTemplate, ThumbnailTemplate } from "@shared/schema";
 import type { ErrorContext } from "./error-handler";
-import fs from 'fs/promises';
 
 export interface VideoGenerationProgress {
   videoId: number;
@@ -68,7 +67,6 @@ export class VideoWorkflowService {
         { videoId, stage: "outline", channelId, templateId: template.id, testMode, retryCount: 0, maxRetries: 3, error: new Error("Initial error"), timestamp: new Date() },
         "openai"
       );
-      await fs.writeFile('data/outline.json', JSON.stringify(outline, undefined, 2));
       context.outline = outline.raw;
       if (outline.chapters.length !== template.imageCount) {
         throw new Error(`OpenAI API Error: The number of chapters is invalid.`);
@@ -83,8 +81,6 @@ export class VideoWorkflowService {
       context.script = script;
       context.title = title;
       await this.logProgress(videoId, "script", 45, "Generated full script");
-      await fs.writeFile('data/script.json', script);
-      await fs.writeFile('data/chapterSegments.json', JSON.stringify(chapterSegments, undefined, 2));
 
       // Step 4: Generate hook (if enabled)
       let hook = "";
@@ -103,7 +99,6 @@ export class VideoWorkflowService {
         ...segment,
         image: images[i] || images[images.length - 1]
       }));
-      await fs.writeFile('data/imageAssignments.json', JSON.stringify(imageAssignments, undefined, 2));
 
       // Step 7: Generate audio segments
       const { audioSegments, bgAudio } = await this.generateAudio(template, imageAssignments);
@@ -111,7 +106,6 @@ export class VideoWorkflowService {
 
       // Step 8: Render video with Remotion
       const videoConfig = this.buildVideoConfig(title, script, audioSegments, images, template, channel, bgAudio);
-      await fs.writeFile('data/videoConfig.json', JSON.stringify(videoConfig, undefined, 2));
       const videoPath = await remotionService.renderVideo(videoConfig, `output/video_${videoId}.mp4`);
       await this.logProgress(videoId, "rendering", 85, "Video rendering completed");
 
