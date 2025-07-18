@@ -45,11 +45,6 @@ export class ElevenLabsService {
 
   async generateAudio(text: string, voiceId: string, filename: string): Promise<AudioSegment> {
     try {
-      return {
-        text,
-        filename,
-        duration: this.estimateAudioDuration(text) // Rough estimation
-      };
       const response = await fetch(`${this.baseUrl}/text-to-speech/${voiceId}`, {
         method: 'POST',
         headers: {

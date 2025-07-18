@@ -388,6 +388,21 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
       {/* Render watermark */}
       {renderWatermark()}
       
+      {/* Render audio segments */}
+      {audioSegments.map((segment, index) => {
+        const segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
+        return (
+          <Sequence key={index} from={segmentStart / 1000 * fps}>
+            <Audio src={segment.filename} />
+          </Sequence>
+        );
+      })}
+      
+      {!!bgAudio && (
+        <Sequence from={0}>
+          <Audio src={bgAudio} />
+        </Sequence>
+      )}
     </AbsoluteFill>
   );
 };

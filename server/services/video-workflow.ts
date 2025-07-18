@@ -132,23 +132,23 @@ export class VideoWorkflowService {
 
       await this.logProgress(videoId, "complete", 100, testMode ? "Test video generation completed" : "Video published successfully");
     } catch (error) {
-      // await storage.updateVideo(videoId, {
-      //   status: "error",
-      //   errorMessage: error instanceof Error ? error.message : "Unknown error",
-      // });
+      await storage.updateVideo(videoId, {
+        status: "error",
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
+      });
       
-      // await storage.createJobLog({
-      //   type: "video",
-      //   entityId: videoId,
-      //   status: "error",
-      //   message: `Video generation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      //   details: {
-      //     channelId,
-      //     templateId: template.id,
-      //     testMode,
-      //     error: error instanceof Error ? error.stack : error
-      //   }
-      // });
+      await storage.createJobLog({
+        type: "video",
+        entityId: videoId,
+        status: "error",
+        message: `Video generation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        details: {
+          channelId,
+          templateId: template.id,
+          testMode,
+          error: error instanceof Error ? error.stack : error
+        }
+      });
 
       throw error;
     }
