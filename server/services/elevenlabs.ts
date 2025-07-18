@@ -65,7 +65,7 @@ export class ElevenLabsService {
       });
 
       if (!response.ok) {
-        throw new Error(`ElevenLabs API error: ${response.statusText}`);
+        throw new Error(`ElevenLabs API error: ${await response.text()}`);
       }
 
       const audioBuffer = await response.arrayBuffer();

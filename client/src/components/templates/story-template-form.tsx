@@ -75,15 +75,9 @@ export default function StoryTemplateForm({
       storyOutlinePrompt:
         editingTemplate?.storyOutlinePrompt ??
         "Based on the provided idea, create a detailed story outline with 3-5 chapters. Include chapter names and brief descriptions. Make it engaging and suitable for a 10-15 minute video.",
-      fullStoryPrompt:
-        editingTemplate?.fullStoryPrompt ??
-        "Using the story outline, write a complete, engaging script for a YouTube video. The script should be approximately 2000-3000 words, maintain suspense throughout, and use vivid, descriptive language.",
       imagePrompt:
         editingTemplate?.imagePrompt ??
         "Analyze the script and generate detailed image prompts for key scenes. Each prompt should include the main subject, artistic style (cinematic, dramatic, ethereal), mood, lighting, and color palette.",
-      imageAssignmentPrompt:
-        editingTemplate?.imageAssignmentPrompt ??
-        "Match the generated images to specific segments of the script for optimal visual storytelling. Consider pacing, narrative flow, and emotional impact when making assignments.",
       imageModel: editingTemplate?.imageModel ?? "flux-schnell",
       imageFallbackModel: editingTemplate?.imageFallbackModel ?? "dalle-3",
       audioModel: editingTemplate?.audioModel ?? "eleven_labs",
@@ -104,7 +98,6 @@ export default function StoryTemplateForm({
       captionsFont: editingTemplate?.captionsFont ?? "Inter",
       captionsColor: editingTemplate?.captionsColor ?? "#ffffff",
       captionsPosition: editingTemplate?.captionsPosition ?? "bottom",
-      captionsWordsPerTime: editingTemplate?.captionsWordsPerTime ?? 3,
       videoTransitions: editingTemplate?.videoTransitions ?? "mix-fade",
       transitionDuration: editingTemplate?.transitionDuration ?? 2,
     },
@@ -285,25 +278,6 @@ export default function StoryTemplateForm({
                   </FormItem>
                 )}
               />
-
-              <FormField
-                control={form.control}
-                name="fullStoryPrompt"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Story Prompt</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Prompt for generating complete scripts..."
-                        rows={3}
-                        {...field}
-                        value={field.value ?? undefined}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
             {/* Image Generation */}
@@ -322,25 +296,6 @@ export default function StoryTemplateForm({
                     <FormControl>
                       <Textarea
                         placeholder="Prompt for generating image descriptions..."
-                        rows={3}
-                        {...field}
-                        value={field.value ?? undefined}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="imageAssignmentPrompt"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Image Assignment Prompt</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Prompt for assigning images to script segments..."
                         rows={3}
                         {...field}
                         value={field.value ?? undefined}
@@ -659,29 +614,6 @@ export default function StoryTemplateForm({
                           <SelectItem value="center">Center</SelectItem>
                         </SelectContent>
                       </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="captionsWordsPerTime"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Words per Display</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={10}
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value))
-                          }
-                          value={field.value ?? undefined}
-                        />
-                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

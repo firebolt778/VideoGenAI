@@ -224,9 +224,6 @@ export class TestingService {
       if (!template.storyOutlinePrompt) {
         errors.push(`Template ${template.name}: Missing story outline prompt`);
       }
-      if (!template.fullStoryPrompt) {
-        errors.push(`Template ${template.name}: Missing full story prompt`);
-      }
       if (!template.imagePrompt) {
         errors.push(`Template ${template.name}: Missing image prompt`);
       }
@@ -255,8 +252,8 @@ export class TestingService {
       if (template.storyOutlinePrompt && template.storyOutlinePrompt.length < 50) {
         warnings.push(`Template ${template.name}: Story outline prompt is very short`);
       }
-      if (template.fullStoryPrompt && template.fullStoryPrompt.length < 100) {
-        warnings.push(`Template ${template.name}: Full story prompt is very short`);
+      if (template.videoLength && (template.videoLength < 5 || template.videoLength > 120)) {
+        warnings.push(`Template ${template.name}: Video length should be between 5 and 120 minutes`);
       }
       if (template.imageCount && (template.imageCount < 3 || template.imageCount > 20)) {
         warnings.push(`Template ${template.name}: Image count should be between 3 and 20`);
@@ -311,7 +308,7 @@ export class TestingService {
       
       // Test with a simple prompt
       const testPrompt = "Generate a simple story outline for a 5-minute video about technology.";
-      const result = await openaiService.generateStoryOutline("Test idea", testPrompt);
+      const result = await openaiService.generateStoryOutline("Test idea", 5, testPrompt);
       
       if (!result.title || !result.chapters || result.chapters.length === 0) {
         throw new Error("OpenAI service returned invalid response format");

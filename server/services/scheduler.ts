@@ -125,8 +125,10 @@ export class SchedulerService {
         status: "generating",
       });
 
+      const thumbnails = await storage.getThumbnailTemplates();
+
       // Generate video
-      await videoWorkflowService.generateVideo(video.id, job.channelId, template, false);
+      await videoWorkflowService.generateVideo(video.id, job.channelId, template, thumbnails[0], false);
       
       job.status = 'completed';
       

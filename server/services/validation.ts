@@ -95,14 +95,8 @@ export class ValidationService {
     if (!template.storyOutlinePrompt) {
       errors.push("Story outline prompt is required");
     }
-    if (!template.fullStoryPrompt) {
-      errors.push("Full story prompt is required");
-    }
     if (!template.imagePrompt) {
       errors.push("Image prompt is required");
-    }
-    if (!template.imageAssignmentPrompt) {
-      errors.push("Image assignment prompt is required");
     }
     if (!template.ideasList) {
       errors.push("Ideas list is required");
@@ -123,8 +117,8 @@ export class ValidationService {
     if (template.storyOutlinePrompt && template.storyOutlinePrompt.length < 50) {
       warnings.push("Story outline prompt seems too short - consider adding more detail");
     }
-    if (template.fullStoryPrompt && template.fullStoryPrompt.length < 100) {
-      warnings.push("Full story prompt seems too short - consider adding more detail");
+    if (template.videoLength && (template.videoLength < 5 || template.videoLength > 120)) {
+      warnings.push("Video length should be between 5 and 120 minutes");
     }
 
     // Check image settings

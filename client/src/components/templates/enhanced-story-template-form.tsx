@@ -45,11 +45,9 @@ import {
   Mic,
   Music,
   Sparkles,
-  Settings,
   Type,
   Camera,
   Lightbulb,
-  Upload,
   Info,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -97,10 +95,9 @@ export default function EnhancedStoryTemplateForm({
       ideasList: template?.ideasList || "",
       ideasDelimiter: template?.ideasDelimiter || "---",
       storyOutlinePrompt: template?.storyOutlinePrompt || "",
-      fullStoryPrompt: template?.fullStoryPrompt || "",
+      videoLength: template?.videoLength || 60,
       imagePrompt: template?.imagePrompt || "",
       imageCount: template?.imageCount || 8,
-      imageAssignmentPrompt: template?.imageAssignmentPrompt || "",
       imageModel: template?.imageModel || "flux-schnell",
       imageFallbackModel: template?.imageFallbackModel || "dalle-3",
       heroImageModel: template?.heroImageModel || "flux-pro",
@@ -121,7 +118,6 @@ export default function EnhancedStoryTemplateForm({
       captionsFont: template?.captionsFont || "Inter",
       captionsColor: template?.captionsColor || "#ffffff",
       captionsPosition: template?.captionsPosition || "bottom",
-      captionsWordsPerTime: template?.captionsWordsPerTime ?? 3,
       videoTransitions: template?.videoTransitions || "mix-fade",
       transitionDuration: template?.transitionDuration ?? 2,
     },
@@ -365,22 +361,24 @@ export default function EnhancedStoryTemplateForm({
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Full Script Generation *</CardTitle>
+                  <CardTitle>Video Length (minutes) *</CardTitle>
                   <CardDescription>
-                    Convert outline into complete narration script
+                    Specify the desired duration for the generated video in minutes. This helps tailor the script and pacing to fit your preferred video length.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <FormField
                     control={form.control}
-                    name="fullStoryPrompt"
+                    name="videoLength"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Full Story Prompt</FormLabel>
+                        <FormLabel>Video Length (minutes)</FormLabel>
                         <FormControl>
-                          <Textarea
-                            placeholder="Turn this outline into a complete narration script: {{OUTLINE}}&#10;&#10;Write engaging, conversational narration suitable for a 5-10 minute video. Include dramatic pauses and emphasis. Enclose the final script between --- markers."
-                            className="min-h-[120px]"
+                          <Input
+                            placeholder="Enter video length"
+                            type="number"
+                            min={5}
+                            max={120}
                             {...field}
                             value={field.value ?? undefined}
                           />
@@ -475,25 +473,6 @@ export default function EnhancedStoryTemplateForm({
                         <FormControl>
                           <Textarea
                             placeholder="Generate {{imageCount}} image prompts for this script: {{SCRIPT}}&#10;&#10;Create atmospheric, cinematic images that match the story mood. Each image should be described in detail with style, lighting, and composition notes."
-                            className="min-h-[100px]"
-                            {...field}
-                            value={field.value ?? undefined}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="imageAssignmentPrompt"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Image Assignment Prompt *</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Assign these images to script segments: {{IMAGES}} with script: {{SCRIPT}}&#10;&#10;Match each image to the most relevant part of the script. Output format:&#10;Image 1: [script segment] - [image description] - filename: image_001.jpg"
                             className="min-h-[100px]"
                             {...field}
                             value={field.value ?? undefined}
@@ -1028,30 +1007,6 @@ export default function EnhancedStoryTemplateForm({
                               <FormLabel>Text Color</FormLabel>
                               <FormControl>
                                 <Input type="color" {...field} value={field.value ?? undefined} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="captionsWordsPerTime"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>
-                                Words Per Caption: {field.value}
-                              </FormLabel>
-                              <FormControl>
-                                <Slider
-                                  min={1}
-                                  max={8}
-                                  step={1}
-                                  value={[field.value || 3]}
-                                  onValueChange={(value) =>
-                                    field.onChange(value[0])
-                                  }
-                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
