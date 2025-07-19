@@ -1,18 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { 
-  Play, 
-  Pause, 
-  Volume2, 
-  VolumeX, 
-  Download, 
-  ExternalLink,
-  Clock,
-  Eye
-} from 'lucide-react';
+import { Download, ExternalLink, Eye } from 'lucide-react';
 import type { Video } from '@shared/schema';
 
 interface VideoPreviewProps {
@@ -22,39 +13,6 @@ interface VideoPreviewProps {
 }
 
 export default function VideoPreview({ video, isOpen, onClose }: VideoPreviewProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-
-  const handlePlayPause = () => {
-    const videoElement = document.getElementById('video-player') as HTMLVideoElement;
-    if (videoElement) {
-      if (isPlaying) {
-        videoElement.pause();
-      } else {
-        videoElement.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const handleMuteToggle = () => {
-    const videoElement = document.getElementById('video-player') as HTMLVideoElement;
-    if (videoElement) {
-      videoElement.muted = !isMuted;
-      setIsMuted(!isMuted);
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    const videoElement = document.getElementById('video-player') as HTMLVideoElement;
-    if (videoElement) {
-      setCurrentTime(videoElement.currentTime);
-      setDuration(videoElement.duration);
-    }
-  };
-
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -94,41 +52,10 @@ export default function VideoPreview({ video, isOpen, onClose }: VideoPreviewPro
                 id="video-player"
                 className="w-full aspect-video bg-black rounded-lg"
                 controls
-                onTimeUpdate={handleTimeUpdate}
-                onLoadedMetadata={handleTimeUpdate}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
               >
                 <source src={video.videoUrl} type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
-
-              {/* Custom Controls Overlay */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                <div className="flex items-center justify-between text-white">
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handlePlayPause}
-                      className="text-white hover:bg-white/20"
-                    >
-                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleMuteToggle}
-                      className="text-white hover:bg-white/20"
-                    >
-                      {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                    </Button>
-                    <span className="text-sm">
-                      {formatTime(currentTime)} / {formatTime(duration)}
-                    </span>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
