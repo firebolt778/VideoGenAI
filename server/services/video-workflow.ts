@@ -276,7 +276,8 @@ export class VideoWorkflowService {
     
     for (let i = 0; i < imageAssignments.length; i++) {
       const assignment = imageAssignments[i];
-      const voiceId = await this.selectVoice(template.audioVoices || []);
+      // const voiceId = await this.selectVoice(template.audioVoices || []);
+      const voiceId = await this.selectVoice([]);
       
       try {
         const segment = await elevenLabsService.generateAudio(
