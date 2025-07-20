@@ -4,23 +4,25 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { AlertCircle, CheckCircle, Info, AlertTriangle, Filter, Download } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { JobLog } from "@shared/schema";
 
 export default function Logs() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
   const { data: logs, isLoading, refetch } = useQuery<JobLog[]>({
     queryKey: ['/api/logs'],
@@ -81,6 +83,16 @@ export default function Logs() {
     return true;
   }) || [];
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, typeFilter]);
+
+  const totalPages = Math.ceil(filteredLogs.length / pageSize) || 1;
+  const paginatedLogs = filteredLogs.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString();
@@ -136,7 +148,7 @@ export default function Logs() {
             <Filter className="w-4 h-4 text-muted-foreground" />
             <span className="text-sm font-medium">Filters:</span>
           </div>
-          
+
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="All Status" />
@@ -246,57 +258,107 @@ export default function Logs() {
                 <p className="text-muted-foreground">No logs found matching the current filters.</p>
               </div>
             ) : (
-              <ScrollArea className="h-[600px]">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background">
-                    <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Message</TableHead>
-                      <TableHead>Entity ID</TableHead>
-                      <TableHead>Time</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredLogs.map((log) => (
-                      <TableRow key={log.id} className="hover:bg-muted/50">
-                        <TableCell>
-                          {getStatusIcon(log.status)}
-                        </TableCell>
-                        <TableCell>
-                          {getTypeBadge(log.type)}
-                        </TableCell>
-                        <TableCell>
-                          {getStatusBadge(log.status)}
-                        </TableCell>
-                        <TableCell className="max-w-md">
-                          <div className="truncate" title={log.message}>
-                            {log.message}
-                          </div>
-                          {!!log.details && (
-                            <details className="mt-1">
-                              <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                                View details
-                              </summary>
-                              <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-auto">
-                                {JSON.stringify(log.details, null, 2)}
-                              </pre>
-                            </details>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {log.entityId || '-'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatTime(log.createdAt.toString())}
-                        </TableCell>
+              <>
+                {/* Pagination Controls */}
+                <div className="flex justify-between items-center p-4">
+                  <span>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <div className="space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Prev
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+                <ScrollArea className="h-[600px]">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background">
+                      <TableRow>
+                        <TableHead className="w-12"></TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Message</TableHead>
+                        <TableHead>Entity ID</TableHead>
+                        <TableHead>Time</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedLogs.map((log) => (
+                        <TableRow key={log.id} className="hover:bg-muted/50">
+                          <TableCell>
+                            {getStatusIcon(log.status)}
+                          </TableCell>
+                          <TableCell>
+                            {getTypeBadge(log.type)}
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(log.status)}
+                          </TableCell>
+                          <TableCell className="max-w-md">
+                            <div className="truncate" title={log.message}>
+                              {log.message}
+                            </div>
+                            {!!log.details && (
+                              <details className="mt-1">
+                                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                                  View details
+                                </summary>
+                                <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-auto">
+                                  {JSON.stringify(log.details, null, 2)}
+                                </pre>
+                              </details>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {log.entityId || '-'}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatTime(log.createdAt.toString())}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+                {/* Pagination Controls */}
+                <div className="flex justify-between items-center p-4">
+                  <span>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <div className="space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Prev
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -310,7 +372,7 @@ export default function Logs() {
                 <div>
                   <h4 className="font-medium text-blue-900">Automatic Cleanup</h4>
                   <p className="text-sm text-blue-800 mt-1">
-                    Logs older than 7 days are automatically deleted to maintain system performance. 
+                    Logs older than 7 days are automatically deleted to maintain system performance.
                     Export important logs if you need to keep them for longer periods.
                   </p>
                 </div>

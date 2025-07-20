@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
 import Header from "@/components/layout/header";
@@ -58,6 +58,8 @@ export default function Videos() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [scheduleVideo, setScheduleVideo] = useState<VideoWithDetails | null>(null);
   const [scheduledAt, setScheduledAt] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const { data: videos, isLoading, refetch } = useQuery<VideoWithDetails[]>({
     queryKey: ['/api/videos'],
@@ -66,6 +68,22 @@ export default function Videos() {
   const { data: channels } = useQuery<Channel[]>({
     queryKey: ['/api/channels'],
   });
+
+  const filteredVideos = videos?.filter(video => {
+    if (statusFilter !== "all" && video.status !== statusFilter) return false;
+    if (channelFilter !== "all" && video.channelId.toString() !== channelFilter) return false;
+    return true;
+  }) || [];
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, channelFilter]);
+
+  const totalPages = Math.ceil(filteredVideos.length / pageSize) || 1;
+  const paginatedVideos = filteredVideos.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const handleRefresh = () => {
     refetch();
@@ -127,12 +145,6 @@ export default function Videos() {
         return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
   };
-
-  const filteredVideos = videos?.filter(video => {
-    if (statusFilter !== "all" && video.status !== statusFilter) return false;
-    if (channelFilter !== "all" && video.channelId.toString() !== channelFilter) return false;
-    return true;
-  }) || [];
 
   const formatDuration = (seconds?: number) => {
     if (!seconds) return "Unknown";
@@ -271,109 +283,135 @@ export default function Videos() {
                 <p className="text-muted-foreground mb-4">No videos found. Generate your first video to get started.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Channel</TableHead>
-                      <TableHead>Template</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Scheduled</TableHead>
-                      <TableHead className="text-center">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredVideos.map((video) => (
-                      <TableRow key={video.id} className="hover:bg-muted/50">
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            {getStatusIcon(video.status || '')}
-                            {getStatusBadge(video.status || '')}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium text-foreground">{video.title}</div>
-                            {video.errorMessage && (
-                              <div className="text-sm text-red-600 mt-1">
-                                {video.errorMessage}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {video.channel?.name || `Channel ${video.channelId}`}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {video.template?.name || `Template ${video.templateId}`}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {formatDuration(video.duration || 0)}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDate(video.createdAt.toString())}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {video.scheduledAt ? formatDate(video.scheduledAt.toString()) : <span className="text-muted-foreground">Not scheduled</span>}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end space-x-2">
-                            {video.videoUrl && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                title="Preview Video"
-                                onClick={() => handlePreviewVideo(video)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {video.youtubeId && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                title="View on YouTube"
-                                onClick={() => window.open(`https://youtube.com/watch?v=${video.youtubeId}`, '_blank')}
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {video.videoUrl && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                title="Download Video"
-                                onClick={() => handleDownloadVideo(video.videoUrl || '')}
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              title="Schedule Publish"
-                              onClick={() => {
-                                setScheduleVideo(video);
-                                setScheduledAt(video.scheduledAt ? video.scheduledAt.toISOString().slice(0, 16) : "");
-                                setScheduleModalOpen(true);
-                              }}
-                            >
-                              <Calendar className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+              <>
+                {/* Pagination Controls */}
+                <div className="flex justify-between items-center p-4">
+                  <span>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <div className="space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Prev
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Channel</TableHead>
+                        <TableHead>Template</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Scheduled</TableHead>
+                        <TableHead className="text-center">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedVideos.map((video) => (
+                        <TableRow key={video.id} className="hover:bg-muted/50">
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              {getStatusIcon(video.status || '')}
+                              {getStatusBadge(video.status || '')}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium text-foreground">{video.title}</div>
+                              {video.errorMessage && (
+                                <div className="text-sm text-red-600 mt-1">
+                                  {video.errorMessage}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {video.channel?.name || `Channel ${video.channelId}`}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {video.template?.name || `Template ${video.templateId}`}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {formatDuration(video.duration || 0)}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDate(video.createdAt.toString())}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {video.scheduledAt ? formatDate(video.scheduledAt.toString()) : <span className="text-muted-foreground">Not scheduled</span>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end space-x-2">
+                              {video.videoUrl && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  title="Preview Video"
+                                  onClick={() => handlePreviewVideo(video)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {video.youtubeId && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  title="View on YouTube"
+                                  onClick={() => window.open(`https://youtube.com/watch?v=${video.youtubeId}`, '_blank')}
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {video.videoUrl && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  title="Download Video"
+                                  onClick={() => handleDownloadVideo(video.videoUrl || '')}
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                title="Schedule Publish"
+                                onClick={() => {
+                                  setScheduleVideo(video);
+                                  setScheduledAt(video.scheduledAt ? video.scheduledAt.toISOString().slice(0, 16) : "");
+                                  setScheduleModalOpen(true);
+                                }}
+                              >
+                                <Calendar className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
