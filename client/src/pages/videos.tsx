@@ -42,6 +42,7 @@ import {
 import VideoPreview from "@/components/video-preview";
 import type { Video, Channel, VideoTemplate } from "@shared/schema";
 import { Input } from "@/components/ui/input";
+import { TopScrollBarProvider } from "@/components/ui/top-scrollbar";
 import { useToast } from "@/hooks/use-toast";
 
 interface VideoWithDetails extends Video {
@@ -308,7 +309,7 @@ export default function Videos() {
                     </Button>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
+                <TopScrollBarProvider>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -410,7 +411,7 @@ export default function Videos() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
+                </TopScrollBarProvider>
               </>
             )}
           </CardContent>

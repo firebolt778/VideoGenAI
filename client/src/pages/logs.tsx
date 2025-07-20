@@ -12,10 +12,10 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { AlertCircle, CheckCircle, Info, AlertTriangle, Filter, Download } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TopScrollBarProvider } from "@/components/ui/top-scrollbar";
 import type { JobLog } from "@shared/schema";
 
 export default function Logs() {
@@ -283,7 +283,7 @@ export default function Logs() {
                     </Button>
                   </div>
                 </div>
-                <ScrollArea className="h-[600px]">
+                <TopScrollBarProvider>
                   <Table>
                     <TableHeader className="sticky top-0 bg-background">
                       <TableRow>
@@ -332,8 +332,7 @@ export default function Logs() {
                       ))}
                     </TableBody>
                   </Table>
-                  <ScrollBar orientation="horizontal" />
-                </ScrollArea>
+                </TopScrollBarProvider>
                 {/* Pagination Controls */}
                 <div className="flex justify-between items-center p-4">
                   <span>
