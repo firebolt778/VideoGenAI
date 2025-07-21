@@ -69,6 +69,8 @@ export default function EnhancedChannelForm({
       name: channel?.name ?? "",
       url: channel?.url ?? "",
       description: channel?.description ?? "",
+      logoUrl: channel?.logoUrl ?? "",
+      watermarkUrl: channel?.watermarkUrl ?? "",
       watermarkPosition: channel?.watermarkPosition ?? "bottom-right",
       watermarkOpacity: channel?.watermarkOpacity ?? 80,
       watermarkSize: channel?.watermarkSize ?? 15,
@@ -231,61 +233,117 @@ export default function EnhancedChannelForm({
               {/* Logo Upload */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Channel Logo</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="mt-4">
-                    <label htmlFor="logo-upload" className="cursor-pointer">
-                      <span className="mt-2 block text-sm font-medium text-gray-900">
-                        Upload PNG logo with transparent background
-                      </span>
-                      <input
-                        id="logo-upload"
-                        type="file"
-                        accept="image/png,image/jpeg,image/svg+xml"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleLogoUpload(file);
-                        }}
-                      />
+                <div className="flex flex-col md:flex-row items-center gap-6">
+                  {/* Logo Preview */}
+                  <div className="flex flex-col items-center">
+                    <div className="h-24 w-24 border-2 border-gray-200 rounded-lg flex items-center justify-center bg-white overflow-hidden">
+                      {form.watch("logoUrl") ? (
+                        <img
+                          src={form.watch("logoUrl") ?? undefined}
+                          alt="Logo preview"
+                          className="h-20 w-20 object-contain"
+                        />
+                      ) : (
+                        <Upload className="h-10 w-10 text-gray-300" />
+                      )}
+                    </div>
+                    {form.watch("logoUrl") && (
+                      <button
+                        type="button"
+                        className="mt-2 text-xs text-red-500 hover:underline"
+                        onClick={() => form.setValue("logoUrl", "")}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  {/* Upload Button */}
+                  <div className="flex flex-col items-center gap-2">
+                    <input
+                      id="logo-upload"
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleLogoUpload(file);
+                      }}
+                    />
+                    <label htmlFor="logo-upload">
+                      <Button
+                        asChild
+                        type="button"
+                        variant="outline"
+                        disabled={uploadingLogo}
+                        className="w-40"
+                      >
+                        <span>
+                          {uploadingLogo ? "Uploading..." : form.watch("logoUrl") ? "Replace Logo" : "Upload Logo"}
+                        </span>
+                      </Button>
                     </label>
+                    <span className="text-xs text-muted-foreground text-center max-w-xs">
+                      PNG, JPEG, or SVG. Transparent background recommended.
+                    </span>
                   </div>
                 </div>
-                {form.watch("logoUrl") && (
-                  <div className="mt-2">
-                    <img
-                      src={form.watch("logoUrl") ?? undefined}
-                      alt="Logo preview"
-                      className="h-16 w-16 object-contain"
-                    />
-                  </div>
-                )}
               </div>
 
               {/* Watermark Settings */}
               <div className="space-y-4">
                 <label className="text-sm font-medium">Video Watermark</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="mt-4">
-                    <label
-                      htmlFor="watermark-upload"
-                      className="cursor-pointer"
-                    >
-                      <span className="mt-2 block text-sm font-medium text-gray-900">
-                        Upload watermark image for videos
-                      </span>
-                      <input
-                        id="watermark-upload"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleWatermarkUpload(file);
-                        }}
-                      />
+                <div className="flex flex-col md:flex-row items-center gap-6">
+                  {/* Watermark Preview */}
+                  <div className="flex flex-col items-center">
+                    <div className="h-24 w-24 border-2 border-gray-200 rounded-lg flex items-center justify-center bg-white overflow-hidden">
+                      {form.watch("watermarkUrl") ? (
+                        <img
+                          src={form.watch("watermarkUrl") ?? undefined}
+                          alt="Watermark preview"
+                          className="h-20 w-20 object-contain"
+                        />
+                      ) : (
+                        <Upload className="h-10 w-10 text-gray-300" />
+                      )}
+                    </div>
+                    {form.watch("watermarkUrl") && (
+                      <button
+                        type="button"
+                        className="mt-2 text-xs text-red-500 hover:underline"
+                        onClick={() => form.setValue("watermarkUrl", "")}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  {/* Upload Button */}
+                  <div className="flex flex-col items-center gap-2">
+                    <input
+                      id="watermark-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleWatermarkUpload(file);
+                      }}
+                    />
+                    <label htmlFor="watermark-upload">
+                      <Button
+                        asChild
+                        type="button"
+                        variant="outline"
+                        disabled={uploadingWatermark}
+                        className="w-40"
+                      >
+                        <span>
+                          {uploadingWatermark ? "Uploading..." : form.watch("watermarkUrl") ? "Replace Watermark" : "Upload Watermark"}
+                        </span>
+                      </Button>
                     </label>
+                    <span className="text-xs text-muted-foreground text-center max-w-xs">
+                      PNG, JPEG, SVG, etc. Transparent background recommended.
+                    </span>
                   </div>
                 </div>
 
@@ -628,3 +686,4 @@ export default function EnhancedChannelForm({
     </div>
   );
 }
+
