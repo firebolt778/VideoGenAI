@@ -1,12 +1,11 @@
 import { Link, useLocation } from "wouter";
-import { 
-  Video, 
-  Tv, 
-  Film, 
-  Image, 
-  PlayCircle, 
-  ListChecks, 
-  BarChart3, 
+import {
+  Tv,
+  Film,
+  Image,
+  PlayCircle,
+  ListChecks,
+  BarChart3,
   User,
   Settings as SettingsIcon,
   Play,
@@ -35,8 +34,8 @@ export default function Sidebar() {
         {/* Logo/Brand */}
         <div className="flex items-center px-6 py-4 border-b border-sidebar-border">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Video className="w-4 h-4 text-primary-foreground" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+              <img src="/favicon.png" alt="Logo" />
             </div>
             <h1 className="text-lg font-semibold text-sidebar-foreground">VideoAI Pro</h1>
           </div>
@@ -47,7 +46,7 @@ export default function Sidebar() {
           {navigation.map((item) => {
             const isActive = location === item.href;
             const Icon = item.icon;
-            
+
             return (
               <Link
                 key={item.name}
