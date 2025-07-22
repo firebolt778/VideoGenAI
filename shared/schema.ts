@@ -25,6 +25,11 @@ export const channels = pgTable("channels", {
   videosMin: integer("videos_min").default(1),
   videosMax: integer("videos_max").default(2),
   chapterIndicators: boolean("chapter_indicators").default(false),
+  // --- Chapter Marker Style Fields ---
+  chapterMarkerBgColor: text("chapter_marker_bg_color").default("#000000"), // default black
+  chapterMarkerFontColor: text("chapter_marker_font_color").default("#FFFFFF"), // default white
+  chapterMarkerFont: text("chapter_marker_font").default("Arial"), // default Arial
+  // --- End Chapter Marker Style Fields ---
   videoIntro: boolean("video_intro").default(false),
   videoIntroUrl: text("video_intro_url"),
   videoOutro: boolean("video_outro").default(false),
@@ -49,6 +54,7 @@ export const videoTemplates = pgTable("video_templates", {
   ideasList: text("ideas_list"),
   ideasDelimiter: text("ideas_delimiter").default("---"),
   storyOutlinePrompt: text("story_outline_prompt"),
+  chapterStoryPrompt: text("chapter_story_prompt"),
   videoLength: integer("video_length"),
   imagePrompt: text("image_prompt"),
   imageCount: integer("image_count").default(8),

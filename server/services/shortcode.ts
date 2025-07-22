@@ -16,6 +16,7 @@ export interface ShortcodeContext {
 export class ShortcodeProcessor {
   static process(template: string, context: ShortcodeContext): string {
     let processed = template;
+    const outline = JSON.parse(context.outline || "{}");
 
     // Replace shortcodes with actual values
     const replacements = {
@@ -23,6 +24,7 @@ export class ShortcodeProcessor {
       '{{OUTLINE}}': context.outline || '',
       '{{SCRIPT}}': context.script || '',
       '{{TITLE}}': context.title || '',
+      '{{SUMMARY}}': outline.summary || '',
       '{{IMAGES}}': context.images?.join('\n') || '',
       '{{CHANNEL_NAME}}': context.channelName || '',
       '{{CHANNEL_DESCRIPTION}}': context.channelDescription || '',

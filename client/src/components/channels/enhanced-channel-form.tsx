@@ -81,6 +81,12 @@ export default function EnhancedChannelForm({
       videoIntro: channel?.videoIntro ?? false,
       videoOutro: channel?.videoOutro ?? false,
       isActive: channel?.isActive ?? true,
+      chapterMarkerBgColor: channel?.chapterMarkerBgColor ?? "#000000",
+      chapterMarkerFont: channel?.chapterMarkerFont ?? "#Arial",
+      chapterMarkerFontColor: channel?.chapterMarkerFontColor ?? "#FFFFFF",
+      videoDescriptionPrompt: channel?.videoDescriptionPrompt ?? "",
+      videoIntroUrl: channel?.videoIntroUrl ?? "",
+      videoOutroUrl: channel?.videoOutroUrl ?? "",
     },
   });
 
@@ -366,19 +372,13 @@ export default function EnhancedChannelForm({
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="top-left">
-                                  Top Left
-                                </SelectItem>
-                                <SelectItem value="top-right">
-                                  Top Right
-                                </SelectItem>
-                                <SelectItem value="bottom-left">
-                                  Bottom Left
-                                </SelectItem>
-                                <SelectItem value="bottom-right">
-                                  Bottom Right
-                                </SelectItem>
                                 <SelectItem value="center">Center</SelectItem>
+                                <SelectItem value="top-center">Top Center</SelectItem>
+                                <SelectItem value="bottom-center">Bottom Center</SelectItem>
+                                <SelectItem value="top-left">Top Left</SelectItem>
+                                <SelectItem value="top-right">Top Right</SelectItem>
+                                <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                                <SelectItem value="bottom-right">Bottom Right</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -452,7 +452,7 @@ export default function EnhancedChannelForm({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-4">
                 <FormField
                   control={form.control}
                   name="chapterIndicators"
@@ -475,6 +475,77 @@ export default function EnhancedChannelForm({
                     </FormItem>
                   )}
                 />
+
+                {/* Chapter Marker Style Controls */}
+                {form.watch("chapterIndicators") && (
+                  <div className="col-span-full grid grid-cols-1 md:grid-cols-3 gap-4 border rounded-lg p-4 bg-muted/30">
+                    <FormField
+                      control={form.control}
+                      name="chapterMarkerBgColor"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Chapter Marker Background Color</FormLabel>
+                          <FormControl className="flex flex-col justify-center">
+                            <Input
+                              type="color"
+                              {...field}
+                              value={field.value || "#000000"}
+                              className="w-12 h-8 p-0 border-none bg-transparent"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="chapterMarkerFontColor"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col justify-center">
+                          <FormLabel>Chapter Marker Font Color</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="color"
+                              {...field}
+                              value={field.value || "#FFFFFF"}
+                              className="w-12 h-8 p-0 border-none bg-transparent"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="chapterMarkerFont"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col justify-center">
+                          <FormLabel>Chapter Marker Font</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value ?? undefined}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select font" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Arial">Arial</SelectItem>
+                              <SelectItem value="Roboto">Roboto</SelectItem>
+                              <SelectItem value="Inter">Inter</SelectItem>
+                              <SelectItem value="Georgia">Georgia</SelectItem>
+                              <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                              <SelectItem value="Courier New">Courier New</SelectItem>
+                              <SelectItem value="Verdana">Verdana</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
 
                 <FormField
                   control={form.control}

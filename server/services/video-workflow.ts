@@ -19,6 +19,15 @@ export interface VideoGenerationProgress {
   error?: string;
 }
 
+interface ChapterSegment {
+  scriptSegment: string;
+  chapterIndex: number;
+  chapter: {
+    name: string;
+    description: string;
+  };
+}
+
 export class VideoWorkflowService {
   private progressCallbacks: Map<number, (progress: VideoGenerationProgress) => void> = new Map();
 
@@ -105,7 +114,7 @@ export class VideoWorkflowService {
       await this.logProgress(videoId, "audio", 80, `Generated ${audioSegments.length} audio segments`);
 
       // Step 8: Render video with Remotion
-      const videoConfig = this.buildVideoConfig(title, script, audioSegments, images, template, channel, bgAudio);
+      const videoConfig = this.buildVideoConfig(title, script, audioSegments, images, chapterSegments, template, channel, bgAudio);
       const videoPath = await remotionService.renderVideo(videoConfig, `output/video_${videoId}.mp4`);
       await this.logProgress(videoId, "rendering", 85, "Video rendering completed");
 
@@ -155,18 +164,18 @@ export class VideoWorkflowService {
   }
 
   private async logProgress(videoId: number, stage: string, progress: number, message: string) {
-    await storage.createJobLog({
-      type: "video",
-      entityId: videoId,
-      status: "info",
-      message,
-      details: { stage, progress }
-    });
+    // await storage.createJobLog({
+    //   type: "video",
+    //   entityId: videoId,
+    //   status: "info",
+    //   message,
+    //   details: { stage, progress }
+    // });
 
-    const callback = this.progressCallbacks.get(videoId);
-    if (callback) {
-      callback({ videoId, stage, progress, message });
-    }
+    // const callback = this.progressCallbacks.get(videoId);
+    // if (callback) {
+    //   callback({ videoId, stage, progress, message });
+    // }
   }
 
   private async selectIdea(template: VideoTemplate): Promise<string> {
@@ -201,11 +210,11 @@ export class VideoWorkflowService {
   private async generateScriptAndAssignImages(
     template: VideoTemplate,
     context: ShortcodeContext,
-  ): Promise<{ fullScript: string, chapterSegments: { scriptSegment: string, chapterIndex: number, chapter: any }[] }> {
+  ): Promise<{ fullScript: string, chapterSegments: ChapterSegment[] }> {
     const outline = JSON.parse(context.outline || "{}");
     let fullScript = "";
     let previousScript = "";
-    const chapterSegments: { scriptSegment: string, chapterIndex: number, chapter: any }[] = [];
+    const chapterSegments: ChapterSegment[] = [];
   
     for (let i = 0; i < outline.chapters.length; i++) {
       const chapter = outline.chapters[i];
@@ -340,11 +349,12 @@ export class VideoWorkflowService {
     script: string,
     audioSegments: any[],
     images: any[],
+    chapterSegments: ChapterSegment[],
     template: VideoTemplate,
     channel: Channel,
     bgAudio?: string
   ): RemotionVideoConfig {
-    return {
+    const config: RemotionVideoConfig = {
       title,
       script,
       audioSegments,
@@ -358,7 +368,7 @@ export class VideoWorkflowService {
         url: channel.watermarkUrl,
         position: channel.watermarkPosition || "bottom-right",
         opacity: (channel.watermarkOpacity || 80) / 100,
-        size: (channel.watermarkSize || 15) / 100
+        size: channel.watermarkSize || 5
       } : undefined,
       effects: template.videoEffects || {
         kenBurns: true,
@@ -372,8 +382,23 @@ export class VideoWorkflowService {
         font: template.captionsFont || "Inter",
         color: template.captionsColor || "#ffffff",
         position: template.captionsPosition || "bottom",
-      }
+      },
     };
+    if (channel.chapterIndicators) {
+      const chapterMarkers: { text: string; time: number }[] = [];
+      for (let i = 0; i < chapterSegments.length; i++) {
+        const audio = audioSegments.slice(0, i);
+        chapterMarkers.push({
+          text: chapterSegments[i].chapter.name,
+          time: audio.reduce((sum, aud) => sum + (aud.duration || 0), 0),
+        });
+      }
+      config.chapterMarkers = chapterMarkers;
+      config.chapterMarkerBgColor = channel.chapterMarkerBgColor || undefined;
+      config.chapterMarkerFont = channel.chapterMarkerFont || undefined;
+      config.chapterMarkerFontColor = channel.chapterMarkerFontColor || undefined;
+    }
+    return config;
   }
 
   // --- UPDATED: Accept images and thumbnailTemplate, support granular fallback ---

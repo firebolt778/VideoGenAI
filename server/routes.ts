@@ -48,6 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch stats" });
+      console.error(error);
     }
   });
 
@@ -58,6 +59,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(channels);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch channels" });
+      console.error(error);
     }
   });
 
@@ -71,6 +73,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(channel);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch channel" });
+      console.error(error);
     }
   });
 
@@ -90,6 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(channel);
     } catch (error) {
       res.status(400).json({ message: (error as Error).message || "Failed to create channel" });
+      console.error(error);
     }
   });
 

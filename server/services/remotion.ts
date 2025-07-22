@@ -41,6 +41,14 @@ export interface RemotionVideoConfig {
     type: string;
     duration: number;
   };
+  // --- Chapter marker additions ---
+  chapterMarkers?: Array<{
+    time: number; // seconds
+    text: string;
+  }>;
+  chapterMarkerBgColor?: string;
+  chapterMarkerFontColor?: string;
+  chapterMarkerFont?: string;
   [key: string]: unknown;
 }
 
@@ -86,6 +94,7 @@ export class RemotionService {
         config.watermark.url = config.watermark.url.startsWith('http')
           ? config.watermark.url
           : `${assetBaseUrl}${config.watermark.url}`;
+        config.watermark.url = config.watermark.url.replace('//uploads/', '/uploads/');
       }
       if (config.bgAudio) {
         config.bgAudio = `${assetBaseUrl}uploads/music/${config.bgAudio}`;
@@ -197,6 +206,14 @@ interface StoryVideoProps {
     type: string;
     duration: number;
   };
+  // --- Chapter marker additions ---
+  chapterMarkers?: Array<{
+    time: number; // seconds
+    text: string;
+  }>;
+  chapterMarkerBgColor?: string;
+  chapterMarkerFontColor?: string;
+  chapterMarkerFont?: string;
 }
 
 export const StoryVideo: React.FC<StoryVideoProps> = ({
@@ -208,13 +225,24 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   watermark,
   effects,
   captions,
-  transitions
+  transitions,
+  chapterMarkers = [],
+  chapterMarkerBgColor = '#000',
+  chapterMarkerFontColor = '#fff',
+  chapterMarkerFont = 'Arial',
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
+  // --- Chapter Marker Screen ---
+  const CHAPTER_MARKER_FRAMES = Math.round(2 * fps);
+  const CHAPTER_MARKER_DURATION = 2.5; // seconds
+
   const renderImage = (image: any, index: number) => {
-    const segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
+    let segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
+    if (chapterMarkers.length) {
+      segmentStart += CHAPTER_MARKER_DURATION * (index + 1) * 1000;
+    }
     const segmentDuration = audioSegments[index]?.duration || 0;
     const segmentFrames = Math.ceil((segmentDuration / 1000) * fps);
     
@@ -289,7 +317,10 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     if (!captions?.enabled) return null;
 
     const currentSegmentIndex = audioSegments.findIndex((_, index) => {
-      const segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
+      let segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
+      if (chapterMarkers.length) {
+        segmentStart += CHAPTER_MARKER_DURATION * (index + 1) * 1000;
+      }
       const segmentEnd = segmentStart + audioSegments[index]?.duration;
       return frame >= (segmentStart / 1000) * fps && frame < (segmentEnd / 1000) * fps;
     });
@@ -297,7 +328,10 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     if (currentSegmentIndex === -1) return null;
 
     const currentSegment = audioSegments[currentSegmentIndex];
-    const segmentStart = audioSegments.slice(0, currentSegmentIndex).reduce((sum, seg) => sum + seg.duration, 0);
+    let segmentStart = audioSegments.slice(0, currentSegmentIndex).reduce((sum, seg) => sum + seg.duration, 0);
+    if (chapterMarkers.length) {
+      segmentStart += CHAPTER_MARKER_DURATION * (currentSegmentIndex + 1) * 1000;
+    }
     const segmentDuration = currentSegment.duration;
     const segmentStartFrame = (segmentStart / 1000) * fps;
     const segmentEndFrame = ((segmentStart + segmentDuration) / 1000) * fps;
@@ -343,10 +377,10 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     const position = watermark.position || 'bottom-right';
     const style: React.CSSProperties = {
       position: 'absolute',
-      width: \`\${watermark.size}%\`,
+      width: \`\${watermark.size || 5}%\`,
       height: 'auto',
-      opacity: watermark.opacity / 100,
-      zIndex: 10
+      opacity: watermark.opacity,
+      zIndex: 1000
     };
 
     switch (position) {
@@ -363,9 +397,24 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         style.left = '5%';
         break;
       case 'bottom-right':
-      default:
         style.bottom = '5%';
         style.right = '5%';
+        break;
+      case 'top-center':
+        style.top = '5%';
+        style.left = '50%';
+        style.transform = 'translateX(-50%)';
+        break;
+      case 'bottom-center':
+        style.bottom = '5%';
+        style.left = '50%';
+        style.transform = 'translateX(-50%)';
+        break;
+      case 'center':
+      default:
+        style.top = '50%';
+        style.left = '50%';
+        style.transform = 'translate(-50%, -50%)';
         break;
     }
 
@@ -377,17 +426,67 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     );
   };
 
+  const renderChapterMarker = (text: string, from: number) => {
+    // Fade in/out
+    const localFrame = useCurrentFrame() - from;
+    const fadeIn = Math.min(1, localFrame / (fps * 0.5));
+    const fadeOut = Math.max(0, (CHAPTER_MARKER_FRAMES - localFrame) / (fps * 0.5));
+    const opacity = Math.max(0, Math.min(1, Math.min(fadeIn, fadeOut)));
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: chapterMarkerBgColor,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100,
+          opacity,
+          transition: 'opacity 0.5s',
+        }}
+      >
+        <div
+          style={{
+            color: chapterMarkerFontColor,
+            fontFamily: chapterMarkerFont + ', sans-serif',
+            fontSize: '72px',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            padding: '0.5em 1em',
+            borderRadius: '24px',
+            boxShadow: '0 4px 32px rgba(0,0,0,0.5)',
+            maxWidth: '80%',
+            lineHeight: 1.1,
+          }}
+        >
+          {text}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      {/* Chapter marker screens */}
+      {chapterMarkers.map((marker, i) => (
+        <Sequence
+          key={i}
+          from={Math.round((marker.time / 1000 + CHAPTER_MARKER_DURATION * i) * fps)}
+          durationInFrames={CHAPTER_MARKER_FRAMES}
+        >
+          {renderChapterMarker(marker.text, Math.round((marker.time / 1000 + CHAPTER_MARKER_DURATION * i) * fps))}
+        </Sequence>
+      ))}
       {/* Render images with effects */}
       {images.map((image, index) => renderImage(image, index))}
-      
       {/* Render captions */}
       {renderCaptions()}
-      
       {/* Render watermark */}
       {renderWatermark()}
-      
       {/* Render audio segments */}
       {audioSegments.map((segment, index) => {
         const segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
@@ -397,7 +496,6 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
           </Sequence>
         );
       })}
-      
       {!!bgAudio && (
         <Sequence from={0}>
           <Audio src={bgAudio} />
