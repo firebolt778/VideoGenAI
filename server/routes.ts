@@ -7,6 +7,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import * as fsSync from "fs";
+import { getVideoDuration } from "./utils/video-metadata";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -25,6 +26,18 @@ const upload = multer({
       cb(new Error('Invalid file type. Only images are allowed.'));
     }
   }
+});
+
+const uploadVideo = multer({
+  dest: 'uploads/video/',
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = ["video/mp4", "video/mkv", "video/avi", "video/mov"];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Only video files are allowed."));
+    }
+  },
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -195,6 +208,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ url: `/uploads/${filename}` });
     } catch (error) {
       res.status(500).json({ message: "Failed to upload watermark" });
+    }
+  });
+
+  app.post("/api/upload/video", uploadVideo.single('video'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const filename = `video_${Date.now()}_${req.file.originalname}`;
+      const filepath = path.join('uploads', 'video', filename);
+
+      await fs.rename(req.file.path, filepath);
+      const duration = await getVideoDuration(filepath);
+
+      res.json({
+        url: `/uploads/video/${filename}`,
+        duration,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload video" });
     }
   });
 

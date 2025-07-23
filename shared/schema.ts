@@ -32,8 +32,12 @@ export const channels = pgTable("channels", {
   // --- End Chapter Marker Style Fields ---
   videoIntro: boolean("video_intro").default(false),
   videoIntroUrl: text("video_intro_url"),
+  introDissolveTime: integer("intro_dissolve_time").default(1), // seconds
+  introDuration: integer("intro_duration").default(5), // seconds
   videoOutro: boolean("video_outro").default(false),
   videoOutroUrl: text("video_outro_url"),
+  outroDissolveTime: integer("outro_dissolve_time").default(1), // seconds
+  outroDuration: integer("outro_duration").default(5), // seconds
   videoDescriptionPrompt: text("video_description_prompt"),
   status: text("status").default("inactive"), // active, inactive, processing, error
   currentTask: text("current_task"),

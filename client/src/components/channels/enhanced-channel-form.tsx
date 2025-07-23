@@ -53,6 +53,7 @@ export default function EnhancedChannelForm({
   const queryClient = useQueryClient();
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingWatermark, setUploadingWatermark] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const isEditing = !!channel;
 
   const { data: videoTemplates } = useQuery<VideoTemplate[]>({
@@ -87,6 +88,10 @@ export default function EnhancedChannelForm({
       videoDescriptionPrompt: channel?.videoDescriptionPrompt ?? "",
       videoIntroUrl: channel?.videoIntroUrl ?? "",
       videoOutroUrl: channel?.videoOutroUrl ?? "",
+      introDissolveTime: channel?.introDissolveTime ?? 1,
+      outroDissolveTime: channel?.outroDissolveTime ?? 1,
+      introDuration: channel?.introDuration ?? 0,
+      outroDuration: channel?.outroDuration ?? 0,
     },
   });
 
@@ -151,7 +156,63 @@ export default function EnhancedChannelForm({
     }
   };
 
+  const handleIntroVideoUpload = async (file: File) => {
+    setUploadingVideo(true);
+    const formData = new FormData();
+    formData.append("video", file);
+
+    try {
+      const response = await fetch("/api/upload/video", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+      form.setValue("videoIntroUrl", result.url);
+      form.setValue("introDuration", Math.ceil(result.duration));
+      toast({ title: "Video uploaded successfully" });
+    } catch (error) {
+      toast({ title: "Failed to upload video", variant: "destructive" });
+    } finally {
+      setUploadingVideo(false);
+    }
+  }
+
+  const handleOutroVideoUpload = async (file: File) => {
+    setUploadingVideo(true);
+    const formData = new FormData();
+    formData.append("video", file);
+
+    try {
+      const response = await fetch("/api/upload/video", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+      form.setValue("videoOutroUrl", result.url);
+      form.setValue("outroDuration", Math.ceil(result.duration));
+      toast({ title: "Video uploaded successfully" });
+    } catch (error) {
+      toast({ title: "Failed to upload video", variant: "destructive" });
+    } finally {
+      setUploadingVideo(false);
+    }
+  }
+
   const onSubmit = (data: InsertChannel) => {
+    if (data.videoIntro && !data.videoIntroUrl) {
+      toast({
+        title: "Please upload an intro video",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (data.videoOutro && !data.videoOutroUrl) {
+      toast({
+        title: "Please upload an outro video",
+        variant: "destructive",
+      });
+      return;
+    }
     createChannelMutation.mutate(data);
   };
 
@@ -568,6 +629,86 @@ export default function EnhancedChannelForm({
                   )}
                 />
 
+                {/* Video Intro Settings */}
+                {form.watch("videoIntro") && (
+                  <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-4 border rounded-lg p-4 bg-muted/30">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Intro Video</label>
+                      <div className="flex flex-col md:flex-row items-center gap-6">
+                        <div className="flex flex-col items-center">
+                          <div className="h-24 w-24 border-2 border-gray-200 rounded-lg flex items-center justify-center bg-white overflow-hidden">
+                            {form.watch("videoIntroUrl") ? (
+                              <video
+                                src={form.watch("videoIntroUrl") ?? undefined}
+                                className="h-20 w-20 object-contain"
+                                controls
+                              />
+                            ) : (
+                              <Upload className="h-10 w-10 text-gray-300" />
+                            )}
+                          </div>
+                          {form.watch("videoIntroUrl") && (
+                            <button
+                              type="button"
+                              className="mt-2 text-xs text-red-500 hover:underline"
+                              onClick={() => form.setValue("videoIntroUrl", "")}
+                              disabled={uploadingVideo}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          id="intro-upload"
+                          type="file"
+                          accept="video/*"
+                          className="hidden"
+                          disabled={uploadingVideo}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleIntroVideoUpload(file);
+                          }}
+                        />
+                        <label htmlFor="intro-upload">
+                          <Button
+                            asChild
+                            type="button"
+                            variant="outline"
+                            className="w-40"
+                            disabled={uploadingVideo}
+                          >
+                            <span>
+                              {form.watch("videoIntroUrl") ? "Replace Intro" : "Upload Intro"}
+                            </span>
+                          </Button>
+                        </label>
+                      </div>
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="introDissolveTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Dissolve Time (seconds)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="10"
+                              {...field}
+                              value={field.value ?? 1}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value))
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+
                 <FormField
                   control={form.control}
                   name="videoOutro"
@@ -589,6 +730,86 @@ export default function EnhancedChannelForm({
                   )}
                 />
               </div>
+
+              {/* Video Intro Settings */}
+              {form.watch("videoOutro") && (
+                <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-4 border rounded-lg p-4 bg-muted/30">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Outro Video</label>
+                    <div className="flex flex-col md:flex-row items-center gap-6">
+                      <div className="flex flex-col items-center">
+                        <div className="h-24 w-24 border-2 border-gray-200 rounded-lg flex items-center justify-center bg-white overflow-hidden">
+                          {form.watch("videoOutroUrl") ? (
+                            <video
+                              src={form.watch("videoOutroUrl") ?? undefined}
+                              className="h-20 w-20 object-contain"
+                              controls
+                            />
+                          ) : (
+                            <Upload className="h-10 w-10 text-gray-300" />
+                          )}
+                        </div>
+                        {form.watch("videoOutroUrl") && (
+                          <button
+                            type="button"
+                            className="mt-2 text-xs text-red-500 hover:underline"
+                            onClick={() => form.setValue("videoOutroUrl", "")}
+                            disabled={uploadingVideo}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        id="outro-upload"
+                        type="file"
+                        accept="video/*"
+                        className="hidden"
+                        disabled={uploadingVideo}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleOutroVideoUpload(file);
+                        }}
+                      />
+                      <label htmlFor="outro-upload">
+                        <Button
+                          asChild
+                          type="button"
+                          variant="outline"
+                          className="w-40"
+                          disabled={uploadingVideo}
+                        >
+                          <span>
+                            {form.watch("videoOutroUrl") ? "Replace Outro" : "Upload Outro"}
+                          </span>
+                        </Button>
+                      </label>
+                    </div>
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="outroDissolveTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Dissolve Time (seconds)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="10"
+                            {...field}
+                            value={field.value ?? 1}
+                            onChange={(e) =>
+                              field.onChange(parseFloat(e.target.value))
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
 
               <FormField
                 control={form.control}
@@ -748,8 +969,8 @@ export default function EnhancedChannelForm({
                   ? "Updating..."
                   : "Creating..."
                 : isEditing
-                ? "Update Channel"
-                : "Create Channel"}
+                  ? "Update Channel"
+                  : "Create Channel"}
             </Button>
           </div>
         </form>

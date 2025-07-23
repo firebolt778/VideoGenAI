@@ -80,7 +80,7 @@ export class VideoWorkflowService {
       if (outline.chapters.length !== template.imageCount) {
         throw new Error(`OpenAI API Error: The number of chapters is invalid.`);
       }
-      
+
       const title = outline.title || `${channel.name} Story`;
       await storage.updateVideo(videoId, { title });
       await this.logProgress(videoId, "outline", 15, `Generated outline: ${title}`);
@@ -164,18 +164,18 @@ export class VideoWorkflowService {
   }
 
   private async logProgress(videoId: number, stage: string, progress: number, message: string) {
-    // await storage.createJobLog({
-    //   type: "video",
-    //   entityId: videoId,
-    //   status: "info",
-    //   message,
-    //   details: { stage, progress }
-    // });
+    await storage.createJobLog({
+      type: "video",
+      entityId: videoId,
+      status: "info",
+      message,
+      details: { stage, progress }
+    });
 
-    // const callback = this.progressCallbacks.get(videoId);
-    // if (callback) {
-    //   callback({ videoId, stage, progress, message });
-    // }
+    const callback = this.progressCallbacks.get(videoId);
+    if (callback) {
+      callback({ videoId, stage, progress, message });
+    }
   }
 
   private async selectIdea(template: VideoTemplate): Promise<string> {
@@ -383,6 +383,16 @@ export class VideoWorkflowService {
         color: template.captionsColor || "#ffffff",
         position: template.captionsPosition || "bottom",
       },
+      intro: channel.videoIntroUrl ? {
+        url: channel.videoIntroUrl,
+        dissolveTime: channel.introDissolveTime || 0,
+        duration: channel.introDuration || 0,
+      } : undefined,
+      outro: channel.videoOutroUrl ? {
+        url: channel.videoOutroUrl,
+        dissolveTime: channel.outroDissolveTime || 0,
+        duration: channel.outroDuration || 0,
+      } : undefined,
     };
     if (channel.chapterIndicators) {
       const chapterMarkers: { text: string; time: number }[] = [];

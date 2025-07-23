@@ -49,6 +49,16 @@ export interface RemotionVideoConfig {
   chapterMarkerBgColor?: string;
   chapterMarkerFontColor?: string;
   chapterMarkerFont?: string;
+  intro?: {
+    url: string;
+    dissolveTime: number; // seconds
+    duration: number;
+  };
+  outro?: {
+    url: string;
+    dissolveTime: number; // seconds
+    duration: number;
+  };
   [key: string]: unknown;
 }
 
@@ -100,6 +110,14 @@ export class RemotionService {
         config.bgAudio = `${assetBaseUrl}uploads/music/${config.bgAudio}`;
       }
 
+      if (config.intro) {
+        config.intro.url = `${assetBaseUrl}${config.intro.url}`;
+        config.intro.url = config.intro.url.replace('//uploads/', '/uploads/');
+      }
+      if (config.outro) {
+        config.outro.url = `${assetBaseUrl}${config.outro.url}`;
+        config.outro.url = config.outro.url.replace('//uploads/', '/uploads/');
+      }
       const composition = await selectComposition({
         serveUrl: this.bundlePath,
         id: 'StoryVideo',
@@ -110,8 +128,15 @@ export class RemotionService {
         throw new Error('No composition found');
       }
 
-      const totalDuration = config.audioSegments.reduce((sum, segment) => sum + segment.duration, 0);
-      const durationInFrames = Math.ceil((totalDuration / 1000) * 30);
+      let totalDuration = config.audioSegments.reduce((sum, segment) => sum + segment.duration, 0) / 1000;
+      totalDuration += 2.5 * config.audioSegments.length; // Add 2.5 seconds per segment for transitions
+      if (config.intro) {
+        totalDuration += config.intro.duration || 0;
+      }
+      if (config.outro) {
+        totalDuration += config.outro.duration || 0;
+      }
+      const durationInFrames = Math.ceil(totalDuration * 30);
 
       await renderMedia({
         composition: {
@@ -123,6 +148,7 @@ export class RemotionService {
         outputLocation: outputPath,
         inputProps: config,
         overwrite: true,
+        timeoutInMilliseconds: 120000,
       });
 
       return outputPath;
@@ -164,8 +190,8 @@ export const RemotionVideo: React.FC = () => {
     await fs.writeFile(path.join(compositionsDir, 'Root.tsx'), rootContent);
 
     const storyVideoContent = `
-import React from 'react';
-import { useCurrentFrame, useVideoConfig, Img, Audio, AbsoluteFill, Sequence, interpolate, spring } from 'remotion';
+import React, { useEffect, useState } from 'react';
+import { delayRender, continueRender, useCurrentFrame, useVideoConfig, Img, Audio, AbsoluteFill, Sequence, interpolate, Video } from 'remotion';
 
 interface StoryVideoProps {
   title: string;
@@ -206,7 +232,6 @@ interface StoryVideoProps {
     type: string;
     duration: number;
   };
-  // --- Chapter marker additions ---
   chapterMarkers?: Array<{
     time: number; // seconds
     text: string;
@@ -214,6 +239,16 @@ interface StoryVideoProps {
   chapterMarkerBgColor?: string;
   chapterMarkerFontColor?: string;
   chapterMarkerFont?: string;
+  intro?: {
+    url: string;
+    dissolveTime: number; // seconds
+    duration: number;
+  };
+  outro?: {
+    url: string;
+    dissolveTime: number; // seconds
+    duration: number;
+  };
 }
 
 export const StoryVideo: React.FC<StoryVideoProps> = ({
@@ -225,6 +260,8 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   watermark,
   effects,
   captions,
+  intro,
+  outro,
   transitions,
   chapterMarkers = [],
   chapterMarkerBgColor = '#000',
@@ -234,40 +271,75 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // --- Chapter Marker Screen ---
-  const CHAPTER_MARKER_FRAMES = Math.round(2 * fps);
+  // Timing calculations
   const CHAPTER_MARKER_DURATION = 2.5; // seconds
+  const DISSOLVE_FRAMES = intro?.dissolveTime ? Math.round(intro.dissolveTime * fps) : 0;
+  
+  const introFrames = intro ? Math.round(intro.duration * fps) : 0;
+  const outroFrames = outro ? Math.round(outro.duration * fps) : 0;
+  
+  // Calculate main content timing
+  const totalMainAudioDuration = audioSegments.reduce((sum, seg) => sum + seg.duration, 0);
+  const totalChapterMarkerDuration = chapterMarkers.length * CHAPTER_MARKER_DURATION * 1000; // in ms
+  const mainContentDuration = totalMainAudioDuration + totalChapterMarkerDuration;
+  const mainContentFrames = Math.round((mainContentDuration / 1000) * fps);
+  
+  // Timeline positions
+  const introStartFrame = 0;
+  const introEndFrame = introFrames;
+  const dissolveInStartFrame = Math.max(0, introEndFrame - DISSOLVE_FRAMES);
+  const mainContentStartFrame = introEndFrame;
+  const mainContentEndFrame = mainContentStartFrame + mainContentFrames;
+  const dissolveOutStartFrame = mainContentEndFrame;
+  const outroStartFrame = mainContentEndFrame;
 
   const renderImage = (image: any, index: number) => {
-    let segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
-    if (chapterMarkers.length) {
-      segmentStart += CHAPTER_MARKER_DURATION * (index + 1) * 1000;
-    }
-    const segmentDuration = audioSegments[index]?.duration || 0;
-    const segmentFrames = Math.ceil((segmentDuration / 1000) * fps);
+    // Calculate timing for this specific image segment
+    let segmentStartTime = 0; // in milliseconds
     
-    const isActive = frame >= segmentStart / 1000 * fps && frame < (segmentStart + segmentDuration) / 1000 * fps;
+    // Add time from previous audio segments
+    for (let i = 0; i < index; i++) {
+      segmentStartTime += audioSegments[i].duration;
+      // Add chapter marker time if it exists for this segment
+      if (chapterMarkers[i]) {
+        segmentStartTime += CHAPTER_MARKER_DURATION * 1000;
+      }
+    }
+    
+    // Add current segment's chapter marker time
+    if (chapterMarkers[index]) {
+      segmentStartTime += CHAPTER_MARKER_DURATION * 1000;
+    }
+    
+    const segmentDuration = audioSegments[index]?.duration || 0;
+    const segmentStartFrame = mainContentStartFrame + Math.round((segmentStartTime / 1000) * fps);
+    const segmentEndFrame = segmentStartFrame + Math.round((segmentDuration / 1000) * fps);
+    
+    const isActive = frame >= segmentStartFrame && frame < segmentEndFrame;
     
     if (!isActive) return null;
 
+    // Ken Burns effect calculations
+    const segmentProgress = (frame - segmentStartFrame) / (segmentEndFrame - segmentStartFrame);
     const kenBurnsScale = effects?.kenBurns ? 
-      interpolate(frame, [segmentStart / 1000 * fps, (segmentStart + segmentDuration) / 1000 * fps], [1, 1.1]) : 1;
-    
+      interpolate(segmentProgress, [0, 1], [1, 1.2]) : 1;
+
     const kenBurnsX = effects?.kenBurns ? 
-      interpolate(frame, [segmentStart / 1000 * fps, (segmentStart + segmentDuration) / 1000 * fps], [0, 0.05]) : 0;
+      interpolate(segmentProgress, [0, 1], [0, -50]) : 0;
     
     const kenBurnsY = effects?.kenBurns ? 
-      interpolate(frame, [segmentStart / 1000 * fps, (segmentStart + segmentDuration) / 1000 * fps], [0, 0.05]) : 0;
+      interpolate(segmentProgress, [0, 1], [0, -30]) : 0;
 
     return (
-      <AbsoluteFill key={index}>
+      <AbsoluteFill key={\`image-\${index}\`}>
         <Img
           src={image.filename}
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            transform: \`scale(\${kenBurnsScale}) translate(\${kenBurnsX * 100}%, \${kenBurnsY * 100}%)\`,
+            transform: \`scale(\${kenBurnsScale})\`,
+            transformOrigin: 'center center',
             transition: 'transform 0.5s ease-in-out'
           }}
         />
@@ -304,7 +376,6 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   };
 
   const getCaptionChunks = (text: string, maxWordsPerChunk = 10) => {
-    // Split text into words and group into chunks of maxWordsPerChunk
     const words = text.split(' ');
     const chunks = [];
     for (let i = 0; i < words.length; i += maxWordsPerChunk) {
@@ -316,34 +387,56 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   const renderCaptions = () => {
     if (!captions?.enabled) return null;
 
-    const currentSegmentIndex = audioSegments.findIndex((_, index) => {
-      let segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
-      if (chapterMarkers.length) {
-        segmentStart += CHAPTER_MARKER_DURATION * (index + 1) * 1000;
+    // Find current segment based on main content timing
+    const frameInMainContent = frame - mainContentStartFrame;
+    if (frameInMainContent < 0) return null;
+
+    let currentTime = 0; // in milliseconds
+    let currentSegmentIndex = -1;
+
+    for (let i = 0; i < audioSegments.length; i++) {
+      // Add chapter marker time
+      if (chapterMarkers[i]) {
+        currentTime += CHAPTER_MARKER_DURATION * 1000;
       }
-      const segmentEnd = segmentStart + audioSegments[index]?.duration;
-      return frame >= (segmentStart / 1000) * fps && frame < (segmentEnd / 1000) * fps;
-    });
+      
+      const segmentStartTime = currentTime;
+      const segmentEndTime = currentTime + audioSegments[i].duration;
+      const segmentStartFrame = Math.round((segmentStartTime / 1000) * fps);
+      const segmentEndFrame = Math.round((segmentEndTime / 1000) * fps);
+      
+      if (frameInMainContent >= segmentStartFrame && frameInMainContent < segmentEndFrame) {
+        currentSegmentIndex = i;
+        break;
+      }
+      
+      currentTime += audioSegments[i].duration;
+    }
 
     if (currentSegmentIndex === -1) return null;
 
     const currentSegment = audioSegments[currentSegmentIndex];
-    let segmentStart = audioSegments.slice(0, currentSegmentIndex).reduce((sum, seg) => sum + seg.duration, 0);
-    if (chapterMarkers.length) {
-      segmentStart += CHAPTER_MARKER_DURATION * (currentSegmentIndex + 1) * 1000;
+    
+    // Calculate segment timing for caption chunking
+    let segmentStartTime = 0;
+    for (let i = 0; i < currentSegmentIndex; i++) {
+      if (chapterMarkers[i]) {
+        segmentStartTime += CHAPTER_MARKER_DURATION * 1000;
+      }
+      segmentStartTime += audioSegments[i].duration;
     }
+    if (chapterMarkers[currentSegmentIndex]) {
+      segmentStartTime += CHAPTER_MARKER_DURATION * 1000;
+    }
+    
+    const segmentStartFrame = Math.round((segmentStartTime / 1000) * fps);
     const segmentDuration = currentSegment.duration;
-    const segmentStartFrame = (segmentStart / 1000) * fps;
-    const segmentEndFrame = ((segmentStart + segmentDuration) / 1000) * fps;
+    const segmentFrames = Math.round((segmentDuration / 1000) * fps);
 
-    // Split caption into chunks (tweak maxWordsPerChunk as needed for 2 lines)
+    // Split caption into chunks
     const chunks = getCaptionChunks(currentSegment.text, 10);
-
-    // Calculate which chunk to show based on frame
-    const framesPerChunk = (segmentEndFrame - segmentStartFrame) / chunks.length;
-    const chunkIndex = Math.floor((frame - segmentStartFrame) / framesPerChunk);
-
-    // Clamp chunkIndex to valid range
+    const framesPerChunk = segmentFrames / chunks.length;
+    const chunkIndex = Math.floor((frameInMainContent - segmentStartFrame) / framesPerChunk);
     const safeChunkIndex = Math.max(0, Math.min(chunkIndex, chunks.length - 1));
 
     return (
@@ -426,85 +519,167 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     );
   };
 
-  const renderChapterMarker = (text: string, from: number) => {
+  const renderChapterMarker = (markerIndex: number) => {
+    const marker = chapterMarkers[markerIndex];
+    if (!marker) return null;
+
+    // Calculate when this chapter marker should appear
+    let markerStartTime = 0; // in milliseconds
+    
+    // Add time from previous segments and their chapter markers
+    for (let i = 0; i < markerIndex; i++) {
+      if (chapterMarkers[i]) {
+        markerStartTime += CHAPTER_MARKER_DURATION * 1000;
+      }
+      markerStartTime += audioSegments[i]?.duration || 0;
+    }
+    
+    const markerStartFrame = mainContentStartFrame + Math.round((markerStartTime / 1000) * fps);
+    const markerDuration = Math.round(CHAPTER_MARKER_DURATION * fps);
+    
+    const localFrame = frame - markerStartFrame;
+    if (localFrame < 0 || localFrame >= markerDuration) return null;
+    
     // Fade in/out
-    const localFrame = useCurrentFrame() - from;
-    const fadeIn = Math.min(1, localFrame / (fps * 0.5));
-    const fadeOut = Math.max(0, (CHAPTER_MARKER_FRAMES - localFrame) / (fps * 0.5));
+    const fadeInFrames = fps * 0.5;
+    const fadeOutFrames = fps * 0.5;
+    const fadeIn = Math.min(1, localFrame / fadeInFrames);
+    const fadeOut = Math.max(0, (markerDuration - localFrame) / fadeOutFrames);
     const opacity = Math.max(0, Math.min(1, Math.min(fadeIn, fadeOut)));
+
     return (
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: 0,
-          right: 0,
-          backgroundColor: chapterMarkerBgColor,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100,
-          opacity,
-          transition: 'opacity 0.5s',
-        }}
-      >
+      <AbsoluteFill key={\`chapter-\${markerIndex}\`}>
         <div
           style={{
-            color: chapterMarkerFontColor,
-            fontFamily: chapterMarkerFont + ', sans-serif',
-            fontSize: '72px',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            padding: '0.5em 1em',
-            borderRadius: '24px',
-            boxShadow: '0 4px 32px rgba(0,0,0,0.5)',
-            maxWidth: '80%',
-            lineHeight: 1.1,
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: chapterMarkerBgColor,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            opacity,
           }}
         >
-          {text}
+          <div
+            style={{
+              color: chapterMarkerFontColor,
+              fontFamily: chapterMarkerFont + ', sans-serif',
+              fontSize: '72px',
+              fontWeight: 'bold',
+              textAlign: 'center',
+              padding: '0.5em 1em',
+              borderRadius: '24px',
+              boxShadow: '0 4px 32px rgba(0,0,0,0.5)',
+              maxWidth: '80%',
+              lineHeight: 1.1,
+            }}
+          >
+            {marker.text}
+          </div>
         </div>
-      </div>
+      </AbsoluteFill>
     );
   };
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
-      {/* Chapter marker screens */}
-      {chapterMarkers.map((marker, i) => (
-        <Sequence
-          key={i}
-          from={Math.round((marker.time / 1000 + CHAPTER_MARKER_DURATION * i) * fps)}
-          durationInFrames={CHAPTER_MARKER_FRAMES}
-        >
-          {renderChapterMarker(marker.text, Math.round((marker.time / 1000 + CHAPTER_MARKER_DURATION * i) * fps))}
+      {/* 1. Intro Video */}
+      {intro && (
+        <Sequence from={introStartFrame} durationInFrames={introFrames}>
+          <div style={{
+            opacity: !intro.dissolveTime ? undefined : interpolate(frame, 
+              [introStartFrame, introStartFrame + (intro.dissolveTime * fps), introEndFrame - (intro.dissolveTime * fps), introEndFrame], 
+              [0, 1, 1, 0])
+          }}>
+            <MyVideoComponent src={intro.url} />
+          </div>
         </Sequence>
-      ))}
-      {/* Render images with effects */}
-      {images.map((image, index) => renderImage(image, index))}
-      {/* Render captions */}
-      {renderCaptions()}
-      {/* Render watermark */}
-      {renderWatermark()}
-      {/* Render audio segments */}
+      )}
+
+      {/* 3. Main Content - Images */}
+      {frame >= mainContentStartFrame && frame < mainContentEndFrame && (
+        <div style={{
+          opacity: !outro?.dissolveTime ? undefined : frame < mainContentEndFrame - (outro.dissolveTime * fps) ? 1 : 
+            interpolate(frame, [mainContentEndFrame - (outro.dissolveTime * fps), mainContentEndFrame], [1, 0])
+        }}>
+          {images.map((image, index) => renderImage(image, index))}
+          {renderCaptions()}
+        </div>
+      )}
+
+      {/* 4. Chapter Markers */}
+      {chapterMarkers.map((_, index) => renderChapterMarker(index))}
+
+      {/* 5. Audio Segments */}
       {audioSegments.map((segment, index) => {
-        const segmentStart = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
+        let audioStartTime = 0;
+        
+        // Add time from previous segments and chapter markers
+        for (let i = 0; i < index; i++) {
+          if (chapterMarkers[i]) {
+            audioStartTime += CHAPTER_MARKER_DURATION * 1000;
+          }
+          audioStartTime += audioSegments[i].duration;
+        }
+        
+        // Add current chapter marker time
+        if (chapterMarkers[index]) {
+          audioStartTime += CHAPTER_MARKER_DURATION * 1000;
+        }
+        
+        const audioStartFrame = mainContentStartFrame + Math.round((audioStartTime / 1000) * fps);
+        
         return (
-          <Sequence key={index} from={segmentStart / 1000 * fps}>
+          <Sequence key={\`audio-\${index}\`} from={audioStartFrame}>
             <Audio src={segment.filename} />
           </Sequence>
         );
       })}
-      {!!bgAudio && (
+
+      {/* 6. Background Audio */}
+      {bgAudio && (
         <Sequence from={0}>
-          <Audio src={bgAudio} />
+          <Audio src={bgAudio} volume={0.3} />
         </Sequence>
       )}
+
+      {/* 8. Outro Video */}
+      {outro && (
+        <Sequence from={outroStartFrame} durationInFrames={outroFrames}>
+          <div style={{
+            opacity: !outro.dissolveTime ? undefined : interpolate(frame, [0, fps * outro.dissolveTime], [0, 1])
+          }}>
+            <MyVideoComponent src={outro.url} />
+          </div>
+        </Sequence>
+      )}
+
+      {/* 9. Watermark - Always visible */}
+      {renderWatermark()}
     </AbsoluteFill>
   );
 };
-`;
+
+const MyVideoComponent = ({ src }: { src: string }) => {
+  const [handle] = useState(() => delayRender());
+
+  useEffect(() => {
+    const video = document.createElement('video');
+    video.src = src;
+    video.onloadeddata = () => continueRender(handle);
+    video.onerror = () => continueRender(handle);
+    
+    return () => {
+      video.remove();
+    };
+  }, [src, handle]);
+
+  return <Video src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
+};`;
 
     await fs.writeFile(path.join(compositionsDir, 'StoryVideo.tsx'), storyVideoContent);
   }
@@ -512,17 +687,17 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   async generateThumbnail(videoPath: string, outputPath: string, timeInSeconds: number = 5): Promise<string> {
     try {
       const ffmpeg = await import('fluent-ffmpeg');
-      
+
       return new Promise((resolve, reject) => {
-              ffmpeg.default(videoPath)
-                .screenshots({
-                  timestamps: [timeInSeconds],
-                  filename: path.basename(outputPath),
-                  folder: path.dirname(outputPath),
-                  size: '1280x720'
-                })
-                .on('end', () => resolve(outputPath))
-                .on('error', reject);
+        ffmpeg.default(videoPath)
+          .screenshots({
+            timestamps: [timeInSeconds],
+            filename: path.basename(outputPath),
+            folder: path.dirname(outputPath),
+            size: '1280x720'
+          })
+          .on('end', () => resolve(outputPath))
+          .on('error', reject);
       });
     } catch (error) {
       throw new Error(`Failed to generate thumbnail: ${(error as Error).message}`);
