@@ -66,17 +66,6 @@ const SHORTCODE_INFO = [
   { code: "{{CHANNEL_NAME}}", description: "Channel name" },
 ];
 
-const VOICE_OPTIONS = [
-  { id: "rachel", name: "Rachel - Calm Female" },
-  { id: "drew", name: "Drew - News Male" },
-  { id: "clyde", name: "Clyde - Warm Male" },
-  { id: "bella", name: "Bella - Soft Female" },
-  { id: "josh", name: "Josh - Deep Male" },
-  { id: "arnold", name: "Arnold - Crisp Male" },
-  { id: "charlotte", name: "Charlotte - Seductive Female" },
-  { id: "matilda", name: "Matilda - Pleasant Female" },
-];
-
 export default function EnhancedStoryTemplateForm({
   template,
   onSuccess,
