@@ -302,6 +302,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   const { fps } = useVideoConfig();
 
   // Memoize timing calculations to avoid recalculation on every frame
+  // NEW ORDER: hook, intro, title, main, outro
   const timingData = useMemo(() => {
     const CHAPTER_MARKER_DURATION = 2.5;
     const TITLE_DURATION = 5;
@@ -317,14 +318,14 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     const mainContentDuration = totalMainAudioDuration + totalChapterMarkerDuration;
     const mainContentFrames = Math.round((mainContentDuration / 1000) * fps);
 
-    // Timeline positions
-    const titleStartFrame = 0;
-    const titleEndFrame = titleFrames;
-    const hookStartFrame = titleEndFrame;
+    // Timeline positions - NEW ORDER: hook, intro, title, main, outro
+    const hookStartFrame = 0;
     const hookEndFrame = hookStartFrame + hookFrames;
     const introStartFrame = hookEndFrame;
     const introEndFrame = introStartFrame + introFrames;
-    const mainContentStartFrame = introEndFrame;
+    const titleStartFrame = introEndFrame;
+    const titleEndFrame = titleStartFrame + titleFrames;
+    const mainContentStartFrame = titleEndFrame;
     const mainContentEndFrame = mainContentStartFrame + mainContentFrames;
     const outroStartFrame = mainContentEndFrame;
 
@@ -337,12 +338,12 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
       outroFrames,
       titleFrames,
       mainContentFrames,
-      titleStartFrame,
-      titleEndFrame,
       hookStartFrame,
       hookEndFrame,
       introStartFrame,
       introEndFrame,
+      titleStartFrame,
+      titleEndFrame,
       mainContentStartFrame,
       mainContentEndFrame,
       outroStartFrame,
@@ -750,10 +751,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
-      {/* Title Screen */}
-      {renderTitle()}
-
-      {/* Hook Content */}
+      {/* Hook Content - NOW FIRST */}
       {hookAudio && (
         <>
           {renderHookImages()}
@@ -764,7 +762,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         </>
       )}
 
-      {/* Intro Video */}
+      {/* Intro Video - NOW SECOND */}
       {intro && (
         <Sequence from={timingData.introStartFrame} durationInFrames={timingData.introFrames}>
           <div style={{
@@ -794,7 +792,10 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         </Sequence>
       )}
 
-      {/* Main Content */}
+      {/* Title Screen - NOW THIRD */}
+      {renderTitle()}
+
+      {/* Main Content - NOW FOURTH */}
       {frame >= timingData.mainContentStartFrame && frame < timingData.mainContentEndFrame && (
         <div style={{
           opacity: !outro?.dissolveTime ? undefined : frame < timingData.mainContentEndFrame - (outro.dissolveTime * fps) ? 1 :
@@ -825,7 +826,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         </Sequence>
       )}
 
-      {/* Outro Video */}
+      {/* Outro Video - REMAINS LAST */}
       {outro && (
         <Sequence from={timingData.outroStartFrame} durationInFrames={timingData.outroFrames}>
           <div style={{
