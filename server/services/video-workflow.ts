@@ -10,6 +10,8 @@ import { validationService } from "./validation";
 import { errorHandlerService } from "./error-handler";
 import type { Channel, VideoTemplate, ThumbnailTemplate, HookTemplate } from "@shared/schema";
 import type { ErrorContext } from "./error-handler";
+import fs from 'fs/promises';
+import defaultConfig from "../../data/videoConfig.json";
 
 export interface VideoGenerationProgress {
   videoId: number;
@@ -32,6 +34,9 @@ export class VideoWorkflowService {
   private progressCallbacks: Map<number, (progress: VideoGenerationProgress) => void> = new Map();
 
   async generateVideo(videoId: number, channelId: number, template: VideoTemplate, testMode: boolean = false): Promise<void> {
+    const videoPath = await remotionService.renderVideo(defaultConfig, `output/video_${videoId}.mp4`);
+    console.log(videoPath);
+    return;
     // Pre-validation
     const validationResult = await validationService.validateVideoGenerationInput(
       channelId,
@@ -60,8 +65,7 @@ export class VideoWorkflowService {
       }
 
       const hookTemplate = await this.selectRandomHookTemplate(channel);
-      // const voiceId = await this.selectVoice(template.audioVoices || []);
-      const voiceId = await this.selectVoice([]);
+      const voiceId = await this.selectVoice(template.audioVoices || []);
 
       // Step 1: Select and process idea
       const selectedIdea = await this.handleErrorWithRetry(
@@ -124,6 +128,7 @@ export class VideoWorkflowService {
 
       // Step 8: Render video with Remotion
       const videoConfig = this.buildVideoConfig(title, script, audioSegments, images, chapterSegments, template, channel, bgAudio, hookAudio);
+      await fs.writeFile("data/videoConfig.json", JSON.stringify(videoConfig, undefined, 2));
       const videoPath = await remotionService.renderVideo(videoConfig, `output/video_${videoId}.mp4`);
       await this.logProgress(videoId, "rendering", 85, "Video rendering completed");
 
@@ -411,7 +416,7 @@ export class VideoWorkflowService {
       hookAudio: hookAudio ? {
         filename: hookAudio.filename || "",
         text: hookAudio.text || "",
-        duration: Math.round((hookAudio.duration || 0) / 1000),
+        duration: Math.ceil((hookAudio.duration || 0) / 1000),
       } : undefined,
       watermark: channel.watermarkUrl ? {
         url: channel.watermarkUrl,

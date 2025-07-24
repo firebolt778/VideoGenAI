@@ -7,6 +7,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import * as fsSync from "fs";
+import { elevenLabsService } from "./services/elevenlabs";
 import { getVideoDuration } from "./utils/video-metadata";
 
 // Configure multer for file uploads
@@ -986,6 +987,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to schedule video" });
     }
   });
+
+  app.get("/api/elevenlabs-voices", async (req, res) => {
+    try {
+      const voices = await elevenLabsService.getAvailableVoices();
+      res.json(voices);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch ElevenLabs voices" });
+    }
+  })
 
   const httpServer = createServer(app);
   return httpServer;

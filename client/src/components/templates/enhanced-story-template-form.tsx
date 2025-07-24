@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
   insertVideoTemplateSchema,
@@ -38,7 +38,6 @@ import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   FileText,
   Image,
@@ -51,6 +50,7 @@ import {
   Info,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ElevenLabsVoice } from "server/services/elevenlabs";
 
 interface EnhancedStoryTemplateFormProps {
   template?: VideoTemplate | null;
@@ -85,6 +85,10 @@ export default function EnhancedStoryTemplateForm({
   const queryClient = useQueryClient();
   const [selectedVoices, setSelectedVoices] = useState<string[]>([]);
   const isEditing = !!template;
+
+  const { data: elevenVoices } = useQuery<ElevenLabsVoice[]>({
+    queryKey: ["/api/elevenlabs-voices"],
+  });
 
   const form = useForm<InsertVideoTemplate>({
     resolver: zodResolver(insertVideoTemplateSchema),
@@ -136,9 +140,8 @@ export default function EnhancedStoryTemplateForm({
     },
     onSuccess: () => {
       toast({
-        title: `Video template ${
-          isEditing ? "updated" : "created"
-        } successfully`,
+        title: `Video template ${isEditing ? "updated" : "created"
+          } successfully`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/video-templates"] });
       onSuccess?.();
@@ -534,7 +537,7 @@ export default function EnhancedStoryTemplateForm({
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <FormField
+                  {/* <FormField
                     control={form.control}
                     name="audioModel"
                     render={({ field }) => (
@@ -564,46 +567,13 @@ export default function EnhancedStoryTemplateForm({
                         <FormMessage />
                       </FormItem>
                     )}
-                  />
+                  /> */}
 
-                  <div className="space-y-4">
-                    <FormLabel>
-                      Voice Selection (Multiple voices will rotate per video)
-                    </FormLabel>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {VOICE_OPTIONS.map((voice) => (
-                        <div
-                          key={voice.id}
-                          className="flex items-center space-x-2"
-                        >
-                          <input
-                            type="checkbox"
-                            id={voice.id}
-                            checked={selectedVoices.includes(voice.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedVoices([
-                                  ...selectedVoices,
-                                  voice.id,
-                                ]);
-                              } else {
-                                setSelectedVoices(
-                                  selectedVoices.filter((v) => v !== voice.id)
-                                );
-                              }
-                            }}
-                            className="rounded"
-                          />
-                          <label
-                            htmlFor={voice.id}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {voice.name}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <VoiceSelectionDropdown
+                    elevenVoices={elevenVoices || []}
+                    selectedVoices={selectedVoices}
+                    setSelectedVoices={setSelectedVoices}
+                  />
 
                   <FormField
                     control={form.control}
@@ -1010,3 +980,256 @@ export default function EnhancedStoryTemplateForm({
     </div>
   );
 }
+
+const VoiceSelectionDropdown: React.FC<{
+  elevenVoices: ElevenLabsVoice[];
+  selectedVoices: string[];
+  setSelectedVoices: React.Dispatch<React.SetStateAction<string[]>>;
+}> = ({ elevenVoices, selectedVoices, setSelectedVoices }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: any) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  // Filter voices based on search term
+  const filteredVoices = elevenVoices.filter(voice =>
+    voice.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    voice.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleVoiceToggle = (voiceId: string) => {
+    if (selectedVoices.includes(voiceId)) {
+      setSelectedVoices(selectedVoices.filter(v => v !== voiceId));
+    } else {
+      setSelectedVoices([...selectedVoices, voiceId]);
+    }
+  };
+
+  const getSelectedVoiceNames = () => {
+    return elevenVoices
+      .filter(voice => selectedVoices.includes(voice.voice_id))
+      .map(voice => voice.name);
+  };
+
+  const clearAll = () => {
+    setSelectedVoices([]);
+  };
+
+  const selectAll = () => {
+    setSelectedVoices(elevenVoices.map(voice => voice.voice_id));
+  };
+
+  const selectAllFiltered = () => {
+    const filteredIds = filteredVoices.map(voice => voice.voice_id);
+    // Avoid using Set to prevent iteration issues; use array filter instead
+    const newSelection = selectedVoices.concat(
+      filteredIds.filter(id => !selectedVoices.includes(id))
+    );
+    setSelectedVoices(newSelection);
+  };
+
+  const handleDropdownToggle = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) {
+      setSearchTerm(''); // Clear search when opening
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <FormLabel className="text-lg font-semibold">
+          Voice Selection
+        </FormLabel>
+        <p className="text-sm text-muted-foreground">
+          Select multiple voices to rotate between videos.
+        </p>
+      </div>
+
+      {elevenVoices && elevenVoices.length > 0 && (
+        <div className="space-y-2">
+          <FormLabel className="text-base font-medium">
+            ElevenLabs Voices
+          </FormLabel>
+          
+          <div className="relative" ref={dropdownRef}>
+            {/* Dropdown Trigger */}
+            <button
+              type="button"
+              onClick={handleDropdownToggle}
+              className="w-full flex items-center justify-between px-3 py-2 text-sm border border-input bg-background rounded-md hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              <div className="flex-1 text-left">
+                {selectedVoices.length === 0 ? (
+                  <span className="text-muted-foreground">Select voices...</span>
+                ) : selectedVoices.length === 1 ? (
+                  <span>{getSelectedVoiceNames()[0]}</span>
+                ) : (
+                  <span>{selectedVoices.length} voices selected</span>
+                )}
+              </div>
+              
+              <svg
+                className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {/* Dropdown Menu */}
+            {isOpen && (
+              <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg">
+                {/* Search Input */}
+                <div className="p-3 border-b border-border">
+                  <div className="relative">
+                    <svg
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      placeholder="Search voices..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                    />
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Header with actions */}
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {searchTerm ? (
+                      <>
+                        {filteredVoices.filter(voice => selectedVoices.includes(voice.voice_id)).length} of {filteredVoices.length} filtered selected
+                      </>
+                    ) : (
+                      <>
+                        {selectedVoices.length} of {elevenVoices.length} selected
+                      </>
+                    )}
+                  </span>
+                  <div className="flex gap-2">
+                    {searchTerm ? (
+                      <button
+                        type="button"
+                        onClick={selectAllFiltered}
+                        className="text-xs text-primary hover:text-primary/80"
+                      >
+                        Select Filtered
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={selectAll}
+                        className="text-xs text-primary hover:text-primary/80"
+                      >
+                        Select All
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={clearAll}
+                      className="text-xs text-primary hover:text-primary/80"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                {/* Voice Options */}
+                <div className="max-h-64 overflow-y-auto">
+                  {filteredVoices.length === 0 ? (
+                    <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                      No voices found matching "{searchTerm}"
+                    </div>
+                  ) : (
+                    filteredVoices.map((voice) => {
+                    const isSelected = selectedVoices.includes(voice.voice_id);
+                    return (
+                      <div
+                        key={voice.voice_id}
+                        onClick={() => handleVoiceToggle(voice.voice_id)}
+                        className="flex items-center px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                      >
+                        <div className={`
+                          w-4 h-4 border-2 rounded flex items-center justify-center mr-3 flex-shrink-0
+                          ${isSelected 
+                            ? 'border-primary bg-primary' 
+                            : 'border-muted-foreground/30'
+                          }
+                        `}>
+                          {isSelected && (
+                            <svg 
+                              className="w-2.5 h-2.5 text-primary-foreground" 
+                              fill="currentColor" 
+                              viewBox="0 0 20 20"
+                            >
+                              <path 
+                                fillRule="evenodd" 
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" 
+                                clipRule="evenodd" 
+                              />
+                            </svg>
+                          )}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">
+                            {voice.name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {voice.category}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
