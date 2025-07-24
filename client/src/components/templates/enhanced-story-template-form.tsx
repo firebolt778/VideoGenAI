@@ -564,7 +564,7 @@ export default function EnhancedStoryTemplateForm({
                     setSelectedVoices={setSelectedVoices}
                   />
 
-                  <FormField
+                  {/* <FormField
                     control={form.control}
                     name="audioPauseGap"
                     render={({ field }) => (
@@ -584,7 +584,7 @@ export default function EnhancedStoryTemplateForm({
                         <FormMessage />
                       </FormItem>
                     )}
-                  />
+                  /> */}
                 </CardContent>
               </Card>
             </TabsContent>
