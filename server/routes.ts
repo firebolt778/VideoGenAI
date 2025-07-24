@@ -69,7 +69,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/channels", async (req, res) => {
     try {
       const channels = await storage.getChannels();
-      res.json(channels);
+      // Fetch hooks and thumbnails for each channel
+      const channelsWithRelations = await Promise.all(channels.map(async (channel) => {
+        const hooks = await storage.getChannelHooks(channel.id);
+        const thumbnails = await storage.getChannelThumbnails(channel.id);
+        return { ...channel, hookIds: hooks.map(h => h.id), hooks, thumbnailIds: thumbnails.map(t => t.id), thumbnails };
+      }));
+      res.json(channelsWithRelations);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch channels" });
       console.error(error);
@@ -83,7 +89,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!channel) {
         return res.status(404).json({ message: "Channel not found" });
       }
-      res.json(channel);
+      const hooks = await storage.getChannelHooks(channel.id);
+      const thumbnails = await storage.getChannelThumbnails(channel.id);
+      res.json({ ...channel, hookIds: hooks.map(h => h.id), hooks, thumbnailIds: thumbnails.map(t => t.id), thumbnails });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch channel" });
       console.error(error);
@@ -92,9 +100,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/channels", async (req, res) => {
     try {
-      const validatedData = insertChannelSchema.parse(req.body);
+      const { hookIds, thumbnailIds, ...channelData } = req.body;
+      const validatedData = insertChannelSchema.parse(channelData);
       const channel = await storage.createChannel(validatedData);
-      
+      // Add hooks
+      if (Array.isArray(hookIds)) {
+        for (const hookId of hookIds) {
+          await storage.addHookToChannel(channel.id, hookId);
+        }
+      }
+      // Add thumbnails
+      if (Array.isArray(thumbnailIds)) {
+        for (const thumbnailId of thumbnailIds) {
+          await storage.addThumbnailToChannel(channel.id, thumbnailId);
+        }
+      }
+      // Fetch hooks and thumbnails for response
+      const hooks = await storage.getChannelHooks(channel.id);
+      const thumbnails = await storage.getChannelThumbnails(channel.id);
       // Log channel creation
       await storage.createJobLog({
         type: 'channel',
@@ -102,8 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'success',
         message: `Channel "${channel.name}" created successfully`
       });
-      
-      res.status(201).json(channel);
+      res.status(201).json({ ...channel, hookIds: hooks.map(h => h.id), hooks, thumbnailIds: thumbnails.map(t => t.id), thumbnails });
     } catch (error) {
       res.status(400).json({ message: (error as Error).message || "Failed to create channel" });
       console.error(error);
@@ -113,13 +135,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/channels/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const validatedData = insertChannelSchema.partial().parse(req.body);
+      const { hookIds, thumbnailIds, ...channelData } = req.body;
+      const validatedData = insertChannelSchema.partial().parse(channelData);
       const channel = await storage.updateChannel(id, validatedData);
-      
       if (!channel) {
         return res.status(404).json({ message: "Channel not found" });
       }
-      
+      // Update hooks
+      if (Array.isArray(hookIds)) {
+        // Remove all existing hooks first
+        const existingHooks = await storage.getChannelHooks(id);
+        for (const hook of existingHooks) {
+          await storage.removeHookFromChannel(id, hook.id);
+        }
+        // Add new hooks
+        for (const hookId of hookIds) {
+          await storage.addHookToChannel(id, hookId);
+        }
+      }
+      // Update thumbnails
+      if (Array.isArray(thumbnailIds)) {
+        // Remove all existing thumbnails first
+        const existingThumbnails = await storage.getChannelThumbnails(id);
+        for (const thumbnail of existingThumbnails) {
+          await storage.removeThumbnailFromChannel(id, thumbnail.id);
+        }
+        // Add new thumbnails
+        for (const thumbnailId of thumbnailIds) {
+          await storage.addThumbnailToChannel(id, thumbnailId);
+        }
+      }
+      // Fetch hooks and thumbnails for response
+      const hooks = await storage.getChannelHooks(id);
+      const thumbnails = await storage.getChannelThumbnails(id);
       // Log channel update
       await storage.createJobLog({
         type: 'channel',
@@ -127,8 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'success',
         message: `Channel "${channel.name}" updated successfully`
       });
-      
-      res.json(channel);
+      res.json({ ...channel, hookIds: hooks.map(h => h.id), hooks, thumbnailIds: thumbnails.map(t => t.id), thumbnails });
     } catch (error) {
       res.status(400).json({ message: (error as Error).message || "Failed to update channel" });
     }
@@ -344,6 +391,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/hook-templates/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const template = await storage.getHookTemplate(id);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ message: (error as Error).message || "Failed to fetch hook template" });
+    }
+  });
+
+  app.put("/api/hook-templates/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertHookTemplateSchema.partial().parse(req.body);
+      const template = await storage.updateHookTemplate(id, validatedData);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(400).json({ message: (error as Error).message || "Failed to update hook template" });
+    }
+  });
+
+  app.delete("/api/hook-templates/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteHookTemplate(id);
+      if (deleted) {
+        res.status(204).send();
+      } else {
+        res.status(404).json({ message: "Template not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: (error as Error).message || "Failed to delete hook template" });
+    }
+  });
+
   // Video routes
   app.get("/api/videos", async (req, res) => {
     try {
@@ -448,10 +536,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Video generation endpoint
   app.post("/api/generate-video", async (req, res) => {
     try {
-      const { channelId, templateId, thumbnailTemplateId, testMode = false } = req.body;
+      const { channelId, templateId, testMode = false } = req.body;
       
-      if (!channelId || !templateId || !thumbnailTemplateId) {
-        return res.status(400).json({ message: "Channel ID, Template ID and Thumbnail Template ID are required" });
+      if (!channelId || !templateId) {
+        return res.status(400).json({ message: "Channel ID and Template ID are required" });
       }
 
       // Enhanced validation
@@ -459,7 +547,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validationResult = await validationService.validateVideoGenerationInput(
         channelId,
         templateId,
-        thumbnailTemplateId,
         testMode
       );
 
@@ -474,10 +561,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const channel = await storage.getChannel(channelId);
       const template = await storage.getVideoTemplate(templateId);
-      const thumbnailTemplate = await storage.getThumbnailTemplate(thumbnailTemplateId);
       
-      if (!channel || !template || !thumbnailTemplate) {
-        return res.status(404).json({ message: "Channel, template or thumbnail template not found" });
+      if (!channel || !template) {
+        return res.status(404).json({ message: "Channel or template not found" });
       }
 
       // Create video record
@@ -494,7 +580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Start generation in background
       setImmediate(async () => {
         try {
-          await videoWorkflowService.generateVideo(video.id, channelId, template, thumbnailTemplate, testMode);
+          await videoWorkflowService.generateVideo(video.id, channelId, template, testMode);
         } catch (err) {
           console.error('Video generation error:', err);
           throw err;
@@ -701,7 +787,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validationResult = await validationService.validateVideoGenerationInput(
         1, // dummy channel ID
         templateId,
-        1, // dummy thumbnail template ID
         true // test mode
       );
 

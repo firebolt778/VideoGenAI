@@ -29,7 +29,11 @@ export const channels = pgTable("channels", {
   chapterMarkerBgColor: text("chapter_marker_bg_color").default("#000000"), // default black
   chapterMarkerFontColor: text("chapter_marker_font_color").default("#FFFFFF"), // default white
   chapterMarkerFont: text("chapter_marker_font").default("Arial"), // default Arial
-  // --- End Chapter Marker Style Fields ---
+  // --- Title Style Fields ---
+  titleFont: text("title_font").default("Arial"),
+  titleColor: text("title_color").default("#FFFFFF"),
+  titleBgColor: text("title_bg_color").default("#000000"),
+  // --- End Title Style Fields ---
   videoIntro: boolean("video_intro").default(false),
   videoIntroUrl: text("video_intro_url"),
   introDissolveTime: integer("intro_dissolve_time").default(1), // seconds
@@ -54,7 +58,6 @@ export const videoTemplates = pgTable("video_templates", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   type: text("type").default("story"), // story, news, educational, etc.
-  hookPrompt: text("hook_prompt"),
   ideasList: text("ideas_list"),
   ideasDelimiter: text("ideas_delimiter").default("---"),
   storyOutlinePrompt: text("story_outline_prompt"),
@@ -107,7 +110,6 @@ export const hookTemplates = pgTable("hook_templates", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   prompt: text("prompt").notNull(),
-  duration: integer("duration").default(10), // seconds
   editSpeed: text("edit_speed").default("medium"), // slow, medium, fast
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -121,6 +123,11 @@ export const channelTemplates = pgTable("channel_templates", {
 export const channelThumbnails = pgTable("channel_thumbnails", {
   channelId: integer("channel_id").references(() => channels.id).notNull(),
   thumbnailId: integer("thumbnail_id").references(() => thumbnailTemplates.id).notNull(),
+});
+
+export const channelHooks = pgTable("channel_hooks", {
+  channelId: integer("channel_id").references(() => channels.id).notNull(),
+  hookId: integer("hook_id").references(() => hookTemplates.id).notNull(),
 });
 
 export const videos = pgTable("videos", {
@@ -179,6 +186,7 @@ export const channelsRelations = relations(channels, ({ many }) => ({
   videos: many(videos),
   templates: many(channelTemplates),
   thumbnails: many(channelThumbnails),
+  hooks: many(channelHooks),
 }));
 
 export const videoTemplatesRelations = relations(videoTemplates, ({ many }) => ({
@@ -188,6 +196,17 @@ export const videoTemplatesRelations = relations(videoTemplates, ({ many }) => (
 
 export const thumbnailTemplatesRelations = relations(thumbnailTemplates, ({ many }) => ({
   channels: many(channelThumbnails),
+}));
+
+export const channelHooksRelations = relations(channelHooks, ({ one }) => ({
+  channel: one(channels, {
+    fields: [channelHooks.channelId],
+    references: [channels.id],
+  }),
+  hook: one(hookTemplates, {
+    fields: [channelHooks.hookId],
+    references: [hookTemplates.id],
+  }),
 }));
 
 export const videosRelations = relations(videos, ({ one }) => ({

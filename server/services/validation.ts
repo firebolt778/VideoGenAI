@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-import type { Channel, VideoTemplate, ThumbnailTemplate } from "@shared/schema";
+import type { VideoTemplate, ThumbnailTemplate } from "@shared/schema";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -21,7 +21,6 @@ export class ValidationService {
   async validateVideoGenerationInput(
     channelId: number,
     templateId: number,
-    thumbnailTemplateId: number,
     testMode: boolean = false
   ): Promise<ValidationResult> {
     const errors: string[] = [];
@@ -51,16 +50,6 @@ export class ValidationService {
         errors.push(...templateValidation.errors);
         warnings.push(...templateValidation.warnings);
         suggestions.push(...templateValidation.suggestions);
-      }
-
-      // Validate thumbnail template
-      const thumbnailTemplate = await storage.getThumbnailTemplate(thumbnailTemplateId);
-      if (!thumbnailTemplate) {
-        errors.push("Thumbnail template not found");
-      } else {
-        const thumbnailValidation = this.validateThumbnailTemplate(thumbnailTemplate);
-        errors.push(...thumbnailValidation.errors);
-        warnings.push(...thumbnailValidation.warnings);
       }
 
       // Check system resources
@@ -129,23 +118,6 @@ export class ValidationService {
     // Check audio settings
     if (template.audioVoices && template.audioVoices.length === 0) {
       warnings.push("No audio voices configured");
-    }
-
-    return { isValid: errors.length === 0, errors, warnings, suggestions };
-  }
-
-  // Thumbnail template validation
-  private validateThumbnailTemplate(template: ThumbnailTemplate): ValidationResult {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    const suggestions: string[] = [];
-
-    if (!template.name) {
-      errors.push("Thumbnail template name is required");
-    }
-
-    if (!template.type) {
-      errors.push("Thumbnail template type is required");
     }
 
     return { isValid: errors.length === 0, errors, warnings, suggestions };

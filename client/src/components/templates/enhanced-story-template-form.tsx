@@ -91,7 +91,6 @@ export default function EnhancedStoryTemplateForm({
     defaultValues: {
       name: template?.name || "",
       type: template?.type || "story",
-      hookPrompt: template?.hookPrompt || "",
       ideasList: template?.ideasList || "",
       ideasDelimiter: template?.ideasDelimiter || "---",
       storyOutlinePrompt: template?.storyOutlinePrompt || "",
@@ -298,35 +297,6 @@ export default function EnhancedStoryTemplateForm({
                       />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Hook Generation</CardTitle>
-                  <CardDescription>
-                    Generate compelling hooks for the beginning of videos
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <FormField
-                    control={form.control}
-                    name="hookPrompt"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Hook Prompt</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Create a 15-second hook for a {{IDEAS}} story. Make it a cliffhanger that captures attention immediately. Use dynamic visuals and suspenseful language."
-                            className="min-h-[100px]"
-                            {...field}
-                            value={field.value ?? undefined}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </CardContent>
               </Card>
 
@@ -803,7 +773,7 @@ export default function EnhancedStoryTemplateForm({
                         </label>
                       </div>
 
-                      {form.watch("videoEffects")?.kenBurns && (
+                      {/* {form.watch("videoEffects")?.kenBurns && (
                         <div className="grid grid-cols-2 gap-4 pl-6">
                           <div>
                             <label className="text-sm font-medium">
@@ -862,7 +832,7 @@ export default function EnhancedStoryTemplateForm({
                             </Select>
                           </div>
                         </div>
-                      )}
+                      )} */}
                     </div>
                   </div>
 

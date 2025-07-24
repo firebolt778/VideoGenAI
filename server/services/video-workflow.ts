@@ -1,5 +1,5 @@
 import { openaiService } from "./openai";
-import { elevenLabsService } from "./elevenlabs";
+import { AudioSegment, elevenLabsService } from "./elevenlabs";
 import { fluxService } from "./flux";
 import { remotionService, RemotionVideoConfig } from "./remotion";
 import { youtubeService } from "./youtube";
@@ -8,7 +8,7 @@ import { ShortcodeProcessor, type ShortcodeContext } from "./shortcode";
 import { storage } from "../storage";
 import { validationService } from "./validation";
 import { errorHandlerService } from "./error-handler";
-import type { Channel, VideoTemplate, ThumbnailTemplate } from "@shared/schema";
+import type { Channel, VideoTemplate, ThumbnailTemplate, HookTemplate } from "@shared/schema";
 import type { ErrorContext } from "./error-handler";
 
 export interface VideoGenerationProgress {
@@ -31,12 +31,11 @@ interface ChapterSegment {
 export class VideoWorkflowService {
   private progressCallbacks: Map<number, (progress: VideoGenerationProgress) => void> = new Map();
 
-  async generateVideo(videoId: number, channelId: number, template: VideoTemplate, thumbnailTemplate: ThumbnailTemplate, testMode: boolean = false): Promise<void> {
+  async generateVideo(videoId: number, channelId: number, template: VideoTemplate, testMode: boolean = false): Promise<void> {
     // Pre-validation
     const validationResult = await validationService.validateVideoGenerationInput(
       channelId,
       template.id,
-      thumbnailTemplate.id,
       testMode
     );
 
@@ -49,12 +48,21 @@ export class VideoWorkflowService {
     }
 
     const channel = await storage.getChannel(channelId);
-  
-    if (!channel || !template || !thumbnailTemplate) {
-      throw new Error("Channel, template or thumbnail template not found");
+
+    if (!channel || !template) {
+      throw new Error("Channel or template not found");
     }
 
     try {
+      const thumbnailTemplate = await this.selectRandomThumbnailTemplate(channel);
+      if (!thumbnailTemplate) {
+        throw new Error("No thumbnail template found");
+      }
+
+      const hookTemplate = await this.selectRandomHookTemplate(channel);
+      // const voiceId = await this.selectVoice(template.audioVoices || []);
+      const voiceId = await this.selectVoice([]);
+
       // Step 1: Select and process idea
       const selectedIdea = await this.handleErrorWithRetry(
         () => this.selectIdea(template),
@@ -92,9 +100,10 @@ export class VideoWorkflowService {
       await this.logProgress(videoId, "script", 45, "Generated full script");
 
       // Step 4: Generate hook (if enabled)
-      let hook = "";
-      if (template.hookPrompt) {
-        hook = await this.generateHook(template, context);
+      let hookAudio: AudioSegment | undefined = undefined;
+      if (hookTemplate) {
+        const hook = await this.generateHook(hookTemplate, context);
+        hookAudio = await this.generateHookAudio(hookTemplate, hook, voiceId);
         await this.logProgress(videoId, "hook", 50, "Generated video hook");
       }
 
@@ -110,11 +119,11 @@ export class VideoWorkflowService {
       }));
 
       // Step 7: Generate audio segments
-      const { audioSegments, bgAudio } = await this.generateAudio(template, imageAssignments);
+      const { audioSegments, bgAudio } = await this.generateAudio(template, imageAssignments, voiceId);
       await this.logProgress(videoId, "audio", 80, `Generated ${audioSegments.length} audio segments`);
 
       // Step 8: Render video with Remotion
-      const videoConfig = this.buildVideoConfig(title, script, audioSegments, images, chapterSegments, template, channel, bgAudio);
+      const videoConfig = this.buildVideoConfig(title, script, audioSegments, images, chapterSegments, template, channel, bgAudio, hookAudio);
       const videoPath = await remotionService.renderVideo(videoConfig, `output/video_${videoId}.mp4`);
       await this.logProgress(videoId, "rendering", 85, "Video rendering completed");
 
@@ -145,7 +154,7 @@ export class VideoWorkflowService {
         status: "error",
         errorMessage: error instanceof Error ? error.message : "Unknown error",
       });
-      
+
       await storage.createJobLog({
         type: "video",
         entityId: videoId,
@@ -189,6 +198,30 @@ export class VideoWorkflowService {
     );
   }
 
+  private async selectRandomThumbnailTemplate(channel: Channel): Promise<ThumbnailTemplate | null> {
+    const thumbnails = await storage.getChannelThumbnails(channel.id);
+    if (!thumbnails || thumbnails.length === 0) {
+      return null;
+    }
+    if (thumbnails.length === 1) {
+      return thumbnails[0];
+    }
+    const randomIndex = Math.floor(Math.random() * thumbnails.length);
+    return thumbnails[randomIndex];
+  }
+
+  private async selectRandomHookTemplate(channel: Channel): Promise<HookTemplate | null> {
+    const hooks = await storage.getChannelHooks(channel.id);
+    if (!hooks || hooks.length === 0) {
+      return null;
+    }
+    if (hooks.length === 1) {
+      return hooks[0];
+    }
+    const randomIndex = Math.floor(Math.random() * hooks.length);
+    return hooks[randomIndex];
+  }
+
   private async generateOutline(template: VideoTemplate, context: ShortcodeContext) {
     if (!template.storyOutlinePrompt) {
       throw new Error("No story outline prompt configured");
@@ -196,7 +229,7 @@ export class VideoWorkflowService {
 
     const prompt = ShortcodeProcessor.process(template.storyOutlinePrompt, context);
     const response = await openaiService.generateStoryOutline(context.selectedIdea || "", template.imageCount || 5, prompt);
-    
+
     return {
       raw: JSON.stringify(response),
       title: response.title,
@@ -215,7 +248,7 @@ export class VideoWorkflowService {
     let fullScript = "";
     let previousScript = "";
     const chapterSegments: ChapterSegment[] = [];
-  
+
     for (let i = 0; i < outline.chapters.length; i++) {
       const chapter = outline.chapters[i];
       const chapterScript = await openaiService.generateScriptForChapter(
@@ -232,15 +265,15 @@ export class VideoWorkflowService {
         chapter
       });
     }
-  
+
     return { fullScript: fullScript.trim(), chapterSegments };
   }
 
-  private async generateHook(template: VideoTemplate, context: ShortcodeContext): Promise<string> {
-    const prompt = ShortcodeProcessor.process(template.hookPrompt!, context);
-    
+  private async generateHook(hookTemplate: HookTemplate, context: ShortcodeContext): Promise<string> {
+    const prompt = ShortcodeProcessor.process(hookTemplate.prompt, context);
+
     // Use OpenAI to generate hook
-    const response = await openaiService.generateFullScript({ title: context.title || "", chapters: [], summary: "" }, prompt);
+    const response = await openaiService.generateFullScript(prompt, context.outline || "");
     return response;
   }
 
@@ -276,18 +309,16 @@ export class VideoWorkflowService {
     return images;
   }
 
-  private async generateAudio(template: VideoTemplate, imageAssignments: any[]) {
+  private async generateAudio(template: VideoTemplate, imageAssignments: any[], voiceId: string) {
     const audioSegments: Array<{
       text: string;
       filename: string;
       duration?: number;
     }> = [];
-    
+
     for (let i = 0; i < imageAssignments.length; i++) {
       const assignment = imageAssignments[i];
-      // const voiceId = await this.selectVoice(template.audioVoices || []);
-      const voiceId = await this.selectVoice([]);
-      
+
       try {
         const segment = await elevenLabsService.generateAudio(
           assignment.scriptSegment,
@@ -310,10 +341,11 @@ export class VideoWorkflowService {
     // Generate background music if enabled
     if (template.backgroundMusicPrompt) {
       try {
-        const totalDuration = audioSegments.reduce((sum, seg) => sum + (seg.duration || 0), 0) / 1000; // Convert to seconds
-        
+        const audioDuration = audioSegments.reduce((sum, seg) => sum + (seg.duration || 0), 0) / 1000; // Convert to seconds
+        const totalDuration = audioDuration + 2.5 * audioSegments.length;
+
         console.log(`Generating background music for ${totalDuration}s duration`);
-        
+
         const music = await backgroundMusicService.generateMusic({
           prompt: template.backgroundMusicPrompt,
           duration: Math.ceil(totalDuration),
@@ -334,12 +366,18 @@ export class VideoWorkflowService {
     return { audioSegments, bgAudio };
   }
 
+  private async generateHookAudio(hookTemplate: HookTemplate, hook: string, voiceId: string) {
+    const hookSpeed = hookTemplate.editSpeed || "medium";
+    const segment = await elevenLabsService.generateAudio(hook, voiceId, 'hook_audio.mp3', hookSpeed);
+    return segment;
+  }
+
   private async selectVoice(voices: string[]): Promise<string> {
     if (voices.length === 0) {
       const voices = await elevenLabsService.getAvailableVoices();
       return voices[0].voice_id;
     }
-    
+
     const randomIndex = Math.floor(Math.random() * voices.length);
     return voices[randomIndex];
   }
@@ -352,10 +390,16 @@ export class VideoWorkflowService {
     chapterSegments: ChapterSegment[],
     template: VideoTemplate,
     channel: Channel,
-    bgAudio?: string
+    bgAudio?: string,
+    hookAudio?: AudioSegment
   ): RemotionVideoConfig {
     const config: RemotionVideoConfig = {
-      title,
+      title: {
+        text: title,
+        bgColor: channel.titleBgColor || "#000000",
+        color: channel.titleColor || "#ffffff",
+        font: channel.titleFont || "Arial",
+      },
       script,
       audioSegments,
       images: images.map(img => ({
@@ -364,6 +408,11 @@ export class VideoWorkflowService {
         scriptSegment: img.prompt || ""
       })),
       bgAudio,
+      hookAudio: hookAudio ? {
+        filename: hookAudio.filename || "",
+        text: hookAudio.text || "",
+        duration: Math.round((hookAudio.duration || 0) / 1000),
+      } : undefined,
       watermark: channel.watermarkUrl ? {
         url: channel.watermarkUrl,
         position: channel.watermarkPosition || "bottom-right",
@@ -383,12 +432,12 @@ export class VideoWorkflowService {
         color: template.captionsColor || "#ffffff",
         position: template.captionsPosition || "bottom",
       },
-      intro: channel.videoIntroUrl ? {
+      intro: (channel.videoIntro && channel.videoIntroUrl) ? {
         url: channel.videoIntroUrl,
         dissolveTime: channel.introDissolveTime || 0,
         duration: channel.introDuration || 0,
       } : undefined,
-      outro: channel.videoOutroUrl ? {
+      outro: (channel.videoOutro && channel.videoOutroUrl) ? {
         url: channel.videoOutroUrl,
         dissolveTime: channel.outroDissolveTime || 0,
         duration: channel.outroDuration || 0,
@@ -438,7 +487,7 @@ export class VideoWorkflowService {
         if (position === 'first') timeInSeconds = 0.5;
         else if (position === 'last') timeInSeconds = Math.max(duration - 1, 0.5);
         else if (position === 'random') timeInSeconds = Math.max(Math.random() * (duration - 1), 0.5);
-      } catch {}
+      } catch { }
       return await remotionService.generateThumbnail(videoPath, outputPath, timeInSeconds);
     };
 
@@ -502,7 +551,7 @@ export class VideoWorkflowService {
       };
       return ShortcodeProcessor.process(channel.videoDescriptionPrompt, context);
     }
-    
+
     return await openaiService.generateVideoDescription(title, script, {
       name: channel.name,
       description: channel.description

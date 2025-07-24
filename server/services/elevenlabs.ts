@@ -43,8 +43,20 @@ export class ElevenLabsService {
     }
   }
 
-  async generateAudio(text: string, voiceId: string, filename: string): Promise<AudioSegment> {
+  async generateAudio(text: string, voiceId: string, filename: string, editSpeed: string = "medium"): Promise<AudioSegment> {
     try {
+      let speed = 1;
+      switch (editSpeed) {
+        case "slow":
+          speed = 0.7;
+          break;
+        case "medium":
+          speed = 1; 
+          break;
+        case "fast":
+          speed = 1.2;
+          break;
+      }
       const response = await fetch(`${this.baseUrl}/text-to-speech/${voiceId}`, {
         method: 'POST',
         headers: {
@@ -56,6 +68,7 @@ export class ElevenLabsService {
           text: text,
           model_id: "eleven_multilingual_v2",
           voice_settings: {
+            speed: speed,
             stability: 0.5,
             similarity_boost: 0.5,
             style: 0.0,

@@ -4,7 +4,12 @@ import path from 'path';
 import fs from 'fs/promises';
 
 export interface RemotionVideoConfig {
-  title: string;
+  title: {
+    text: string;
+    font: string;
+    color: string;
+    bgColor: string;
+  };
   script: string;
   audioSegments: Array<{
     filename: string;
@@ -17,6 +22,11 @@ export interface RemotionVideoConfig {
     scriptSegment: string;
   }>;
   bgAudio?: string;
+  hookAudio?: {
+    filename: string;
+    text: string;
+    duration: number;
+  };
   watermark?: {
     url: string;
     position: string;
@@ -109,6 +119,10 @@ export class RemotionService {
       if (config.bgAudio) {
         config.bgAudio = `${assetBaseUrl}uploads/music/${config.bgAudio}`;
       }
+      if (config.hookAudio) {
+        config.hookAudio.filename =
+          `${assetBaseUrl}uploads/audio/${config.hookAudio.filename}`;
+      }
 
       if (config.intro) {
         config.intro.url = `${assetBaseUrl}${config.intro.url}`;
@@ -136,6 +150,10 @@ export class RemotionService {
       if (config.outro) {
         totalDuration += config.outro.duration || 0;
       }
+      if (config.hookAudio) {
+        totalDuration += config.hookAudio.duration;
+      }
+      totalDuration += 5; // Add 5 seconds for title
       const durationInFrames = Math.ceil(totalDuration * 30);
 
       await renderMedia({
@@ -194,7 +212,12 @@ import React, { useEffect, useState } from 'react';
 import { delayRender, continueRender, useCurrentFrame, useVideoConfig, Img, Audio, AbsoluteFill, Sequence, interpolate, Video } from 'remotion';
 
 interface StoryVideoProps {
-  title: string;
+  title: {
+    text: string;
+    font: string;
+    color: string;
+    bgColor: string;
+  };
   script: string;
   audioSegments: Array<{
     filename: string;
@@ -207,6 +230,11 @@ interface StoryVideoProps {
     scriptSegment: string;
   }>;
   bgAudio?: string;
+  hookAudio?: {
+    filename: string;
+    text: string;
+    duration: number;
+  };
   watermark?: {
     url: string;
     position: string;
@@ -257,6 +285,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   audioSegments,
   images,
   bgAudio,
+  hookAudio,
   watermark,
   effects,
   captions,
@@ -275,6 +304,9 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   const CHAPTER_MARKER_DURATION = 2.5; // seconds
   const DISSOLVE_FRAMES = intro?.dissolveTime ? Math.round(intro.dissolveTime * fps) : 0;
   
+  // Hook timing
+  const hookFrames = hookAudio ? Math.round(hookAudio.duration * fps) : 0;
+
   const introFrames = intro ? Math.round(intro.duration * fps) : 0;
   const outroFrames = outro ? Math.round(outro.duration * fps) : 0;
   
@@ -283,15 +315,158 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   const totalChapterMarkerDuration = chapterMarkers.length * CHAPTER_MARKER_DURATION * 1000; // in ms
   const mainContentDuration = totalMainAudioDuration + totalChapterMarkerDuration;
   const mainContentFrames = Math.round((mainContentDuration / 1000) * fps);
-  
+
+  // Title timing
+  const TITLE_DURATION = 5; // seconds
+  const titleFrames = Math.round(TITLE_DURATION * fps);
+
   // Timeline positions
-  const introStartFrame = 0;
-  const introEndFrame = introFrames;
+  const titleStartFrame = 0;
+  const titleEndFrame = titleFrames;
+  const hookStartFrame = titleEndFrame;
+  const hookEndFrame = hookStartFrame + hookFrames;
+  const introStartFrame = hookEndFrame;
+  const introEndFrame = introStartFrame + introFrames;
   const dissolveInStartFrame = Math.max(0, introEndFrame - DISSOLVE_FRAMES);
   const mainContentStartFrame = introEndFrame;
   const mainContentEndFrame = mainContentStartFrame + mainContentFrames;
   const dissolveOutStartFrame = mainContentEndFrame;
   const outroStartFrame = mainContentEndFrame;
+
+  const renderTitle = () => {
+    const isTitleActive = frame >= titleStartFrame && frame < titleEndFrame;
+    if (!isTitleActive) return null;
+
+    // Calculate fade in/out
+    const fadeFrames = fps * 0.5; // 0.5 second fade
+    const localFrame = frame - titleStartFrame;
+    const fadeIn = Math.min(1, localFrame / fadeFrames);
+    const fadeOut = Math.min(1, (titleFrames - localFrame) / fadeFrames);
+    const opacity = Math.min(fadeIn, fadeOut);
+
+    // Scale animation
+    const scaleProgress = localFrame / titleFrames;
+    const scale = interpolate(scaleProgress, [0, 0.2, 0.8, 1], [0.8, 1.05, 1.02, 1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp'
+    });
+
+    return (
+      <AbsoluteFill key="title-screen">
+        {/* Background */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: \`\${title.bgColor}\`,
+            opacity,
+          }}
+        />
+        {/* Main title */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: \`translate(-50%, -50%) scale(\${scale})\`,
+            color: \`\${title.color}\`,
+            fontFamily: \`\${title.font}\`,
+            fontSize: '84px',
+            fontWeight: '900',
+            textAlign: 'center',
+            textShadow: '0 4px 20px rgba(0,0,0,0.8), 0 0 40px rgba(255,255,255,0.2)',
+            maxWidth: '90%',
+            lineHeight: 1.1,
+            opacity,
+            // background: 'linear-gradient(45deg, #ffffff, #e0e0ff)',
+            // backgroundClip: 'text',
+            // WebkitBackgroundClip: 'text',
+            // WebkitTextFillColor: 'transparent',
+          }}
+        >
+          {title.text}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
+  const renderHookImages = () => {
+    if (!hookAudio || hookFrames === 0) return null;
+
+    const isHookActive = frame >= hookStartFrame && frame < hookEndFrame;
+    if (!isHookActive) return null;
+
+    // Use first few images for the hook (typically 2-4 images for a 10-second hook)
+    const hookImageCount = Math.min(4, images.length);
+    const hookImages = images.slice(0, hookImageCount);
+    const framesPerHookImage = hookFrames / hookImageCount;
+
+    const currentHookImageIndex = Math.floor((frame - hookStartFrame) / framesPerHookImage);
+    const safeHookImageIndex = Math.max(0, Math.min(currentHookImageIndex, hookImages.length - 1));
+    const currentHookImage = hookImages[safeHookImageIndex];
+
+    if (!currentHookImage) return null;
+
+    // Calculate progress within current hook image for Ken Burns effect
+    const imageStartFrame = hookStartFrame + (safeHookImageIndex * framesPerHookImage);
+    const imageEndFrame = imageStartFrame + framesPerHookImage;
+    const imageProgress = (frame - imageStartFrame) / (imageEndFrame - imageStartFrame);
+
+    // Apply Ken Burns effect for hook images
+    const kenBurnsScale = effects?.kenBurns ? 
+      interpolate(imageProgress, [0, 1], [1.1, 1.3]) : 1;
+    const kenBurnsX = effects?.kenBurns ? 
+      interpolate(imageProgress, [0, 1], [0, -30]) : 0;
+    const kenBurnsY = effects?.kenBurns ? 
+      interpolate(imageProgress, [0, 1], [0, -20]) : 0;
+
+    return (
+      <AbsoluteFill key={\`hook-image-\${safeHookImageIndex}\`}>
+        <Img
+          src={currentHookImage.filename}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: \`scale(\${kenBurnsScale})\`,
+            // transform: \`scale(\${kenBurnsScale}) translate(\${kenBurnsX}px, \${kenBurnsY}px)\`,
+            transformOrigin: 'center center',
+          }}
+        />
+        {effects?.fog && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: \`linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))\`,
+              opacity: effects.fogIntensity || 0.3,
+              pointerEvents: 'none'
+            }}
+          />
+        )}
+        {effects?.filmGrain && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: \`url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noise)" opacity="0.1"/></svg>')\`,
+              opacity: 0.1,
+              pointerEvents: 'none'
+            }}
+          />
+        )}
+      </AbsoluteFill>
+    );
+  };
 
   const renderImage = (image: any, index: number) => {
     // Calculate timing for this specific image segment
@@ -382,6 +557,43 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
       chunks.push(words.slice(i, i + maxWordsPerChunk).join(' '));
     }
     return chunks;
+  };
+
+  const renderHookCaptions = () => {
+    if (!captions?.enabled || !hookAudio || hookFrames === 0) return null;
+
+    const isHookActive = frame >= hookStartFrame && frame < hookEndFrame;
+    if (!isHookActive) return null;
+
+    // Split hook text into chunks
+    const chunks = getCaptionChunks(hookAudio.text, 8); // Slightly smaller chunks for hook
+    const framesPerChunk = hookFrames / chunks.length;
+    const chunkIndex = Math.floor((frame - hookStartFrame) / framesPerChunk);
+    const safeChunkIndex = Math.max(0, Math.min(chunkIndex, chunks.length - 1));
+
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          bottom: captions.position === 'bottom' ? '10%' : captions.position === 'top' ? '80%' : '45%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          color: captions.color || '#ffffff',
+          fontFamily: captions.font || 'Inter, sans-serif',
+          fontSize: '52px', // Slightly larger for hook impact
+          fontWeight: 'bold',
+          textAlign: 'center',
+          textShadow: '3px 3px 6px rgba(0,0,0,0.9)',
+          maxWidth: '85%',
+          lineHeight: 1.2,
+          background: 'rgba(0,0,0,0.5)',
+          borderRadius: '12px',
+          padding: '0.3em 0.7em'
+        }}
+      >
+        {chunks[safeChunkIndex]}
+      </div>
+    );
   };
 
   const renderCaptions = () => {
@@ -587,13 +799,41 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
-      {/* 1. Intro Video */}
+      {/* 0. Title Screen - appears first */}
+      {renderTitle()}
+
+      {/* 1. Hook Video - appears first */}
+      {hookAudio && (
+        <>
+          {renderHookImages()}
+          {renderHookCaptions()}
+          <Sequence from={hookStartFrame} durationInFrames={hookFrames}>
+            <Audio src={hookAudio.filename} />
+          </Sequence>
+        </>
+      )}
+
+      {/* 2. Intro Video */}
       {intro && (
         <Sequence from={introStartFrame} durationInFrames={introFrames}>
           <div style={{
-            opacity: !intro.dissolveTime ? undefined : interpolate(frame, 
-              [introStartFrame, introStartFrame + (intro.dissolveTime * fps), introEndFrame - (intro.dissolveTime * fps), introEndFrame], 
-              [0, 1, 1, 0])
+            opacity: !intro.dissolveTime ? 1 : (() => {
+              const dissolveFrames = Math.round(intro.dissolveTime * fps);
+              const fadeInEnd = Math.min(introStartFrame + dissolveFrames, introEndFrame - 1);
+              const fadeOutStart = Math.max(introEndFrame - dissolveFrames, introStartFrame + 1);
+
+              // Ensure we have valid ranges
+              if (fadeInEnd >= fadeOutStart) {
+                // If dissolve time is too long, just use simple fade
+                return interpolate(frame, [introStartFrame, introEndFrame], [0, 1]);
+              }
+              
+              return interpolate(frame, 
+                [introStartFrame, fadeInEnd, fadeOutStart, introEndFrame], 
+                [0, 1, 1, 0],
+                { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+              );
+            })()
           }}>
             <MyVideoComponent src={intro.url} />
           </div>
@@ -642,12 +882,12 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
 
       {/* 6. Background Audio */}
       {bgAudio && (
-        <Sequence from={0}>
+        <Sequence from={mainContentStartFrame}>
           <Audio src={bgAudio} volume={0.3} />
         </Sequence>
       )}
 
-      {/* 8. Outro Video */}
+      {/* 7. Outro Video */}
       {outro && (
         <Sequence from={outroStartFrame} durationInFrames={outroFrames}>
           <div style={{
@@ -658,7 +898,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         </Sequence>
       )}
 
-      {/* 9. Watermark - Always visible */}
+      {/* 8. Watermark - Always visible */}
       {renderWatermark()}
     </AbsoluteFill>
   );

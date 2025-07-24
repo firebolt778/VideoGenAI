@@ -74,26 +74,21 @@ Respond with JSON in this exact format:
     }
   }
 
-  async generateFullScript(outline: StoryOutline, customPrompt?: string, videoLength?: number): Promise<string> {
-    const len = videoLength || 60;
+  async generateFullScript(customPrompt: string, outline: string): Promise<string> {
     const prompt = customPrompt || `
-Based on this story outline, write a complete, engaging script for a YouTube video:
+Write a hook for a story video outline listed below.
+The hook should:
+Set up the main conflict and stakes, hinting at what’s going to happen, without giving away major twists or specific plot details.
+Be intriguing and compelling, encouraging the audience to want to know more.
+End with a cliffhanger line that poses an implicit question or offers a sense of discovery, but without directly referencing YouTube, “stay tuned,” or similar phrases.
+Avoid summarizing the story or revealing key secrets.
+Read like a tagline or teaser - evocative, concise, and cinematic.
+Keep it short, it should take no more than 10 seconds to read aloud.
 
-Title: ${outline.title}
-Summary: ${outline.summary}
-Chapters: ${outline.chapters.map(c => `${c.name}: ${c.description}`).join('\n')}
-
-Write a full narrative script that:
-- Is engaging and keeps viewers hooked
-- Has natural pacing and flow
-- Uses vivid, descriptive language
-- Maintains suspense throughout
-
-Script must be ${len * 135}-${len * 150} words.
-Enclose the script content between --- markers like this:
----
-[Your script here]
----`;
+Here's the outline:
+"""
+${outline}
+"""`;
 
     try {
       const response = await openai.chat.completions.create({

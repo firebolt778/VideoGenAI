@@ -6,7 +6,6 @@ import { apiRequest } from "@/lib/queryClient";
 import {
   insertChannelSchema,
   type InsertChannel,
-  type VideoTemplate,
   type ThumbnailTemplate,
   Channel,
 } from "@shared/schema";
@@ -18,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -37,8 +37,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Upload, Settings, Video, Image, Calendar } from "lucide-react";
+import { Upload, Settings, Video, Image, Calendar, Type } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import type { HookTemplate } from "@shared/schema";
 
 interface EnhancedChannelFormProps {
   channel: Channel | null;
@@ -56,13 +57,25 @@ export default function EnhancedChannelForm({
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const isEditing = !!channel;
 
-  const { data: videoTemplates } = useQuery<VideoTemplate[]>({
-    queryKey: ["/api/video-templates"],
-  });
-
   const { data: thumbnailTemplates } = useQuery<ThumbnailTemplate[]>({
     queryKey: ["/api/thumbnail-templates"],
   });
+
+  const { data: hookTemplates } = useQuery<HookTemplate[]>({
+    queryKey: ["/api/hook-templates"],
+  });
+
+  // Multi-select state for hooks and thumbnails
+  const [selectedHookIds, setSelectedHookIds] = useState<number[]>(
+    channel && "hookIds" in channel && Array.isArray((channel as any).hookIds)
+      ? (channel as any).hookIds
+      : []
+  );
+  const [selectedThumbnailIds, setSelectedThumbnailIds] = useState<number[]>(
+    channel && "thumbnailIds" in channel && Array.isArray((channel as any).thumbnailIds)
+      ? (channel as any).thumbnailIds
+      : []
+  );
 
   const form = useForm<InsertChannel>({
     resolver: zodResolver(insertChannelSchema),
@@ -92,6 +105,9 @@ export default function EnhancedChannelForm({
       outroDissolveTime: channel?.outroDissolveTime ?? 1,
       introDuration: channel?.introDuration ?? 0,
       outroDuration: channel?.outroDuration ?? 0,
+      titleFont: channel?.titleFont ?? "Arial",
+      titleColor: channel?.titleColor ?? "#FFFFFF",
+      titleBgColor: channel?.titleBgColor ?? "#000000",
     },
   });
 
@@ -213,7 +229,18 @@ export default function EnhancedChannelForm({
       });
       return;
     }
-    createChannelMutation.mutate(data);
+    if (!selectedThumbnailIds.length) {
+      toast({
+        title: "Please select at least one thumbnail template",
+        variant: "destructive",
+      });
+      return;
+    }
+    createChannelMutation.mutate({
+      ...data,
+      hookIds: selectedHookIds,
+      thumbnailIds: selectedThumbnailIds,
+    });
   };
 
   return (
@@ -834,6 +861,173 @@ export default function EnhancedChannelForm({
                   </FormItem>
                 )}
               />
+            </CardContent>
+          </Card>
+
+          {/* Title Style Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Type className="h-5 w-5" />
+                Title Style
+              </CardTitle>
+              <CardDescription>
+                Customize the appearance of video titles for this channel
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="titleFont"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Font</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value ?? undefined}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select font" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Arial">Arial</SelectItem>
+                          <SelectItem value="Roboto">Roboto</SelectItem>
+                          <SelectItem value="Inter">Inter</SelectItem>
+                          <SelectItem value="Georgia">Georgia</SelectItem>
+                          <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                          <SelectItem value="Courier New">Courier New</SelectItem>
+                          <SelectItem value="Verdana">Verdana</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="titleColor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Title Color</FormLabel>
+                      <FormControl>
+                        <Input type="color" {...field} value={field.value ?? "#FFFFFF"} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="titleBgColor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Background Color</FormLabel>
+                      <FormControl>
+                        <Input type="color" {...field} value={field.value ?? "#000000"} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Preview Panel for Title */}
+              <div className="mt-4">
+                <FormLabel>Title Preview</FormLabel>
+                <div
+                  className="rounded-lg p-4 mt-2 border"
+                  style={{
+                    backgroundColor: form.watch("titleBgColor") || "#000000",
+                  }}
+                >
+                  <div
+                    className="text-4xl font-semibold text-center"
+                    style={{
+                      color: form.watch("titleColor") || "#FFFFFF",
+                      fontFamily: form.watch("titleFont") || "Arial",
+                    }}
+                  >
+                    Video Generative AI
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Hook Template Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Video className="h-5 w-5" />
+                Hook Templates
+              </CardTitle>
+              <CardDescription>
+                Select which hook templates are enabled for this channel
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {hookTemplates?.map((hook) => (
+                  <label key={hook.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={selectedHookIds.includes(hook.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedHookIds((prev) =>
+                          checked
+                            ? [...prev, hook.id]
+                            : prev.filter((id) => id !== hook.id)
+                        );
+                      }}
+                    />
+                    <span className="text-sm">{hook.name}</span>
+                  </label>
+                ))}
+                {!hookTemplates?.length && (
+                  <div className="text-muted-foreground text-sm col-span-2 py-2 px-3">
+                    No hook templates found for this channel.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Thumbnail Template Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Image className="h-5 w-5" />
+                Thumbnail Templates
+              </CardTitle>
+              <CardDescription>
+                Select which thumbnail templates are enabled for this channel
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {thumbnailTemplates?.map((template) => (
+                  <label key={template.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={selectedThumbnailIds.includes(template.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedThumbnailIds((prev) =>
+                          checked
+                            ? [...prev, template.id]
+                            : prev.filter((id) => id !== template.id)
+                        );
+                      }}
+                    />
+                    <span className="text-sm">{template.name}</span>
+                  </label>
+                ))}
+                {!thumbnailTemplates?.length && (
+                  <div className="text-muted-foreground text-sm col-span-2 py-2 px-3">
+                    No thumbnail templates found for this channel.
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 

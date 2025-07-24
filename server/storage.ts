@@ -20,7 +20,8 @@ import {
   type JobLog,
   type InsertJobLog,
   type Setting,
-  settings
+  settings,
+  channelHooks
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -75,6 +76,11 @@ export interface IStorage {
   removeThumbnailFromChannel(channelId: number, thumbnailId: number): Promise<void>;
   getChannelTemplates(channelId: number): Promise<VideoTemplate[]>;
   getChannelThumbnails(channelId: number): Promise<ThumbnailTemplate[]>;
+  
+  // --- Channel Hooks ---
+  addHookToChannel(channelId: number, hookId: number): Promise<void>;
+  removeHookFromChannel(channelId: number, hookId: number): Promise<void>;
+  getChannelHooks(channelId: number): Promise<HookTemplate[]>;
   
   // Settings
   getSetting(key: string): Promise<Setting | undefined>;
@@ -330,6 +336,30 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(channelThumbnails, eq(thumbnailTemplates.id, channelThumbnails.thumbnailId))
       .where(eq(channelThumbnails.channelId, channelId));
     return result.map(r => r.thumbnail_templates);
+  }
+
+  // --- Channel Hooks ---
+  async addHookToChannel(channelId: number, hookId: number): Promise<void> {
+    await db.insert(channelHooks).values({ channelId, hookId });
+  }
+
+  async removeHookFromChannel(channelId: number, hookId: number): Promise<void> {
+    await db.delete(channelHooks)
+      .where(
+        and(
+          eq(channelHooks.channelId, channelId),
+          eq(channelHooks.hookId, hookId)
+        )
+      );
+  }
+
+  async getChannelHooks(channelId: number): Promise<HookTemplate[]> {
+    const result = await db
+      .select()
+      .from(hookTemplates)
+      .innerJoin(channelHooks, eq(hookTemplates.id, channelHooks.hookId))
+      .where(eq(channelHooks.channelId, channelId));
+    return result.map(r => r.hook_templates);
   }
 
   // Settings

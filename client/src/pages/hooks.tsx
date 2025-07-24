@@ -68,7 +68,6 @@ export default function Hooks() {
     defaultValues: {
       name: "",
       prompt: "",
-      duration: 10,
       editSpeed: "medium",
     },
   });
@@ -263,9 +262,7 @@ export default function Hooks() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Duration</TableHead>
                       <TableHead>Edit Speed</TableHead>
-                      <TableHead>Preview</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -283,21 +280,8 @@ export default function Hooks() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {template.duration}s
-                        </TableCell>
                         <TableCell>
                           {getSpeedBadge(template.editSpeed || "medium")}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2 text-blue-600 hover:text-blue-700"
-                          >
-                            <Play className="h-3 w-3 mr-1" />
-                            Preview
-                          </Button>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(template.createdAt).toLocaleDateString()}
@@ -384,62 +368,37 @@ export default function Hooks() {
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="duration"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Duration (seconds)</FormLabel>
+              <FormField
+                control={form.control}
+                name="editSpeed"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Edit Speed</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value ?? undefined}
+                    >
                       <FormControl>
-                        <Input
-                          type="number"
-                          min={5}
-                          max={30}
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value))
-                          }
-                          value={field.value ?? undefined}
-                        />
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="editSpeed"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Edit Speed</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value ?? undefined}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="slow">
-                            Slow - Dramatic, contemplative pace
-                          </SelectItem>
-                          <SelectItem value="medium">
-                            Medium - Standard storytelling pace
-                          </SelectItem>
-                          <SelectItem value="fast">
-                            Fast - Quick cuts, high energy
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      <SelectContent>
+                        <SelectItem value="slow">
+                          Slow - Dramatic, contemplative pace
+                        </SelectItem>
+                        <SelectItem value="medium">
+                          Medium - Standard storytelling pace
+                        </SelectItem>
+                        <SelectItem value="fast">
+                          Fast - Quick cuts, high energy
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="bg-muted p-4 rounded-lg">
                 <h4 className="font-medium mb-2">Hook Tips</h4>
@@ -464,8 +423,8 @@ export default function Hooks() {
                   {mutation.isPending
                     ? "Saving..."
                     : editingTemplate
-                    ? "Update Hook"
-                    : "Create Hook"}
+                      ? "Update Hook"
+                      : "Create Hook"}
                 </Button>
               </div>
             </form>
