@@ -208,7 +208,7 @@ export const RemotionVideo: React.FC = () => {
     await fs.writeFile(path.join(compositionsDir, 'Root.tsx'), rootContent);
 
     const storyVideoContent = `
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { delayRender, continueRender, useCurrentFrame, useVideoConfig, Img, Audio, AbsoluteFill, Sequence, interpolate, Video } from 'remotion';
 
 interface StoryVideoProps {
@@ -261,7 +261,7 @@ interface StoryVideoProps {
     duration: number;
   };
   chapterMarkers?: Array<{
-    time: number; // seconds
+    time: number;
     text: string;
   }>;
   chapterMarkerBgColor?: string;
@@ -269,19 +269,21 @@ interface StoryVideoProps {
   chapterMarkerFont?: string;
   intro?: {
     url: string;
-    dissolveTime: number; // seconds
+    dissolveTime: number;
     duration: number;
   };
   outro?: {
     url: string;
-    dissolveTime: number; // seconds
+    dissolveTime: number;
     duration: number;
   };
 }
 
+// Memoized film grain SVG to avoid recreation
+const FILM_GRAIN_SVG = \`data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noise)" opacity="0.1"/></svg>\`;
+
 export const StoryVideo: React.FC<StoryVideoProps> = ({
   title,
-  script,
   audioSegments,
   images,
   bgAudio,
@@ -291,7 +293,6 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   captions,
   intro,
   outro,
-  transitions,
   chapterMarkers = [],
   chapterMarkerBgColor = '#000',
   chapterMarkerFontColor = '#fff',
@@ -300,383 +301,113 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Timing calculations
-  const CHAPTER_MARKER_DURATION = 2.5; // seconds
-  const DISSOLVE_FRAMES = intro?.dissolveTime ? Math.round(intro.dissolveTime * fps) : 0;
-  
-  // Hook timing
-  const hookFrames = hookAudio ? Math.round(hookAudio.duration * fps) : 0;
+  // Memoize timing calculations to avoid recalculation on every frame
+  const timingData = useMemo(() => {
+    const CHAPTER_MARKER_DURATION = 2.5;
+    const TITLE_DURATION = 5;
+    const DISSOLVE_FRAMES = intro?.dissolveTime ? Math.round(intro.dissolveTime * fps) : 0;
 
-  const introFrames = intro ? Math.round(intro.duration * fps) : 0;
-  const outroFrames = outro ? Math.round(outro.duration * fps) : 0;
-  
-  // Calculate main content timing
-  const totalMainAudioDuration = audioSegments.reduce((sum, seg) => sum + seg.duration, 0);
-  const totalChapterMarkerDuration = chapterMarkers.length * CHAPTER_MARKER_DURATION * 1000; // in ms
-  const mainContentDuration = totalMainAudioDuration + totalChapterMarkerDuration;
-  const mainContentFrames = Math.round((mainContentDuration / 1000) * fps);
+    const hookFrames = hookAudio ? Math.round(hookAudio.duration * fps) : 0;
+    const introFrames = intro ? Math.round(intro.duration * fps) : 0;
+    const outroFrames = outro ? Math.round(outro.duration * fps) : 0;
+    const titleFrames = Math.round(TITLE_DURATION * fps);
 
-  // Title timing
-  const TITLE_DURATION = 5; // seconds
-  const titleFrames = Math.round(TITLE_DURATION * fps);
+    const totalMainAudioDuration = audioSegments.reduce((sum, seg) => sum + seg.duration, 0);
+    const totalChapterMarkerDuration = chapterMarkers.length * CHAPTER_MARKER_DURATION * 1000;
+    const mainContentDuration = totalMainAudioDuration + totalChapterMarkerDuration;
+    const mainContentFrames = Math.round((mainContentDuration / 1000) * fps);
 
-  // Timeline positions
-  const titleStartFrame = 0;
-  const titleEndFrame = titleFrames;
-  const hookStartFrame = titleEndFrame;
-  const hookEndFrame = hookStartFrame + hookFrames;
-  const introStartFrame = hookEndFrame;
-  const introEndFrame = introStartFrame + introFrames;
-  const dissolveInStartFrame = Math.max(0, introEndFrame - DISSOLVE_FRAMES);
-  const mainContentStartFrame = introEndFrame;
-  const mainContentEndFrame = mainContentStartFrame + mainContentFrames;
-  const dissolveOutStartFrame = mainContentEndFrame;
-  const outroStartFrame = mainContentEndFrame;
+    // Timeline positions
+    const titleStartFrame = 0;
+    const titleEndFrame = titleFrames;
+    const hookStartFrame = titleEndFrame;
+    const hookEndFrame = hookStartFrame + hookFrames;
+    const introStartFrame = hookEndFrame;
+    const introEndFrame = introStartFrame + introFrames;
+    const mainContentStartFrame = introEndFrame;
+    const mainContentEndFrame = mainContentStartFrame + mainContentFrames;
+    const outroStartFrame = mainContentEndFrame;
 
-  const renderTitle = () => {
-    const isTitleActive = frame >= titleStartFrame && frame < titleEndFrame;
-    if (!isTitleActive) return null;
+    return {
+      CHAPTER_MARKER_DURATION,
+      TITLE_DURATION,
+      DISSOLVE_FRAMES,
+      hookFrames,
+      introFrames,
+      outroFrames,
+      titleFrames,
+      mainContentFrames,
+      titleStartFrame,
+      titleEndFrame,
+      hookStartFrame,
+      hookEndFrame,
+      introStartFrame,
+      introEndFrame,
+      mainContentStartFrame,
+      mainContentEndFrame,
+      outroStartFrame,
+    };
+  }, [audioSegments, chapterMarkers, hookAudio, intro, outro, fps]);
 
-    // Calculate fade in/out
-    const fadeFrames = fps * 0.5; // 0.5 second fade
-    const localFrame = frame - titleStartFrame;
-    const fadeIn = Math.min(1, localFrame / fadeFrames);
-    const fadeOut = Math.min(1, (titleFrames - localFrame) / fadeFrames);
-    const opacity = Math.min(fadeIn, fadeOut);
+  // Memoize segment timing calculations
+  const segmentTimings = useMemo(() => {
+    return audioSegments.map((segment, index) => {
+      let segmentStartTime = 0;
 
-    // Scale animation
-    const scaleProgress = localFrame / titleFrames;
-    const scale = interpolate(scaleProgress, [0, 0.2, 0.8, 1], [0.8, 1.05, 1.02, 1], {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp'
+      for (let i = 0; i < index; i++) {
+        segmentStartTime += audioSegments[i].duration;
+        if (chapterMarkers[i]) {
+          segmentStartTime += timingData.CHAPTER_MARKER_DURATION * 1000;
+        }
+      }
+
+      if (chapterMarkers[index]) {
+        segmentStartTime += timingData.CHAPTER_MARKER_DURATION * 1000;
+      }
+
+      const segmentDuration = segment.duration;
+      const segmentStartFrame = timingData.mainContentStartFrame + Math.round((segmentStartTime / 1000) * fps);
+      const segmentEndFrame = segmentStartFrame + Math.round((segmentDuration / 1000) * fps);
+
+      return {
+        startTime: segmentStartTime,
+        duration: segmentDuration,
+        startFrame: segmentStartFrame,
+        endFrame: segmentEndFrame,
+      };
     });
+  }, [audioSegments, chapterMarkers, timingData, fps]);
 
-    return (
-      <AbsoluteFill key="title-screen">
-        {/* Background */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: \`\${title.bgColor}\`,
-            opacity,
-          }}
-        />
-        {/* Main title */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: \`translate(-50%, -50%) scale(\${scale})\`,
-            color: \`\${title.color}\`,
-            fontFamily: \`\${title.font}\`,
-            fontSize: '84px',
-            fontWeight: '900',
-            textAlign: 'center',
-            textShadow: '0 4px 20px rgba(0,0,0,0.8), 0 0 40px rgba(255,255,255,0.2)',
-            maxWidth: '90%',
-            lineHeight: 1.1,
-            opacity,
-            // background: 'linear-gradient(45deg, #ffffff, #e0e0ff)',
-            // backgroundClip: 'text',
-            // WebkitBackgroundClip: 'text',
-            // WebkitTextFillColor: 'transparent',
-          }}
-        >
-          {title.text}
-        </div>
-      </AbsoluteFill>
-    );
-  }
-
-  const renderHookImages = () => {
-    if (!hookAudio || hookFrames === 0) return null;
-
-    const isHookActive = frame >= hookStartFrame && frame < hookEndFrame;
-    if (!isHookActive) return null;
-
-    // Use first few images for the hook (typically 2-4 images for a 10-second hook)
-    const hookImageCount = Math.min(4, images.length);
-    const hookImages = images.slice(0, hookImageCount);
-    const framesPerHookImage = hookFrames / hookImageCount;
-
-    const currentHookImageIndex = Math.floor((frame - hookStartFrame) / framesPerHookImage);
-    const safeHookImageIndex = Math.max(0, Math.min(currentHookImageIndex, hookImages.length - 1));
-    const currentHookImage = hookImages[safeHookImageIndex];
-
-    if (!currentHookImage) return null;
-
-    // Calculate progress within current hook image for Ken Burns effect
-    const imageStartFrame = hookStartFrame + (safeHookImageIndex * framesPerHookImage);
-    const imageEndFrame = imageStartFrame + framesPerHookImage;
-    const imageProgress = (frame - imageStartFrame) / (imageEndFrame - imageStartFrame);
-
-    // Apply Ken Burns effect for hook images
-    const kenBurnsScale = effects?.kenBurns ? 
-      interpolate(imageProgress, [0, 1], [1.1, 1.3]) : 1;
-    const kenBurnsX = effects?.kenBurns ? 
-      interpolate(imageProgress, [0, 1], [0, -30]) : 0;
-    const kenBurnsY = effects?.kenBurns ? 
-      interpolate(imageProgress, [0, 1], [0, -20]) : 0;
-
-    return (
-      <AbsoluteFill key={\`hook-image-\${safeHookImageIndex}\`}>
-        <Img
-          src={currentHookImage.filename}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            transform: \`scale(\${kenBurnsScale})\`,
-            // transform: \`scale(\${kenBurnsScale}) translate(\${kenBurnsX}px, \${kenBurnsY}px)\`,
-            transformOrigin: 'center center',
-          }}
-        />
-        {effects?.fog && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: \`linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))\`,
-              opacity: effects.fogIntensity || 0.3,
-              pointerEvents: 'none'
-            }}
-          />
-        )}
-        {effects?.filmGrain && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: \`url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noise)" opacity="0.1"/></svg>')\`,
-              opacity: 0.1,
-              pointerEvents: 'none'
-            }}
-          />
-        )}
-      </AbsoluteFill>
-    );
-  };
-
-  const renderImage = (image: any, index: number) => {
-    // Calculate timing for this specific image segment
-    let segmentStartTime = 0; // in milliseconds
-    
-    // Add time from previous audio segments
-    for (let i = 0; i < index; i++) {
-      segmentStartTime += audioSegments[i].duration;
-      // Add chapter marker time if it exists for this segment
-      if (chapterMarkers[i]) {
-        segmentStartTime += CHAPTER_MARKER_DURATION * 1000;
+  // Memoize caption chunks to avoid recalculation
+  const captionChunks = useMemo(() => {
+    const getCaptionChunks = (text: string, maxWordsPerChunk = 10) => {
+      const words = text.split(' ');
+      const chunks: string[] = [];
+      for (let i = 0; i < words.length; i += maxWordsPerChunk) {
+        chunks.push(words.slice(i, i + maxWordsPerChunk).join(' '));
       }
+      return chunks;
+    };
+
+    return {
+      hook: hookAudio ? getCaptionChunks(hookAudio.text, 8) : [],
+      segments: audioSegments.map(segment => getCaptionChunks(segment.text, 10)),
+    };
+  }, [hookAudio, audioSegments]);
+
+  // Find current active segment more efficiently
+  const activeSegmentIndex = useMemo(() => {
+    if (frame < timingData.mainContentStartFrame || frame >= timingData.mainContentEndFrame) {
+      return -1;
     }
-    
-    // Add current segment's chapter marker time
-    if (chapterMarkers[index]) {
-      segmentStartTime += CHAPTER_MARKER_DURATION * 1000;
-    }
-    
-    const segmentDuration = audioSegments[index]?.duration || 0;
-    const segmentStartFrame = mainContentStartFrame + Math.round((segmentStartTime / 1000) * fps);
-    const segmentEndFrame = segmentStartFrame + Math.round((segmentDuration / 1000) * fps);
-    
-    const isActive = frame >= segmentStartFrame && frame < segmentEndFrame;
-    
-    if (!isActive) return null;
 
-    // Ken Burns effect calculations
-    const segmentProgress = (frame - segmentStartFrame) / (segmentEndFrame - segmentStartFrame);
-    const kenBurnsScale = effects?.kenBurns ? 
-      interpolate(segmentProgress, [0, 1], [1, 1.2]) : 1;
-
-    const kenBurnsX = effects?.kenBurns ? 
-      interpolate(segmentProgress, [0, 1], [0, -50]) : 0;
-    
-    const kenBurnsY = effects?.kenBurns ? 
-      interpolate(segmentProgress, [0, 1], [0, -30]) : 0;
-
-    return (
-      <AbsoluteFill key={\`image-\${index}\`}>
-        <Img
-          src={image.filename}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            transform: \`scale(\${kenBurnsScale})\`,
-            transformOrigin: 'center center',
-            transition: 'transform 0.5s ease-in-out'
-          }}
-        />
-        {effects?.fog && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: \`linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))\`,
-              opacity: effects.fogIntensity || 0.3,
-              pointerEvents: 'none'
-            }}
-          />
-        )}
-        {effects?.filmGrain && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: \`url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noise)" opacity="0.1"/></svg>')\`,
-              opacity: 0.1,
-              pointerEvents: 'none'
-            }}
-          />
-        )}
-      </AbsoluteFill>
+    return segmentTimings.findIndex(timing =>
+      frame >= timing.startFrame && frame < timing.endFrame
     );
-  };
+  }, [frame, timingData, segmentTimings]);
 
-  const getCaptionChunks = (text: string, maxWordsPerChunk = 10) => {
-    const words = text.split(' ');
-    const chunks = [];
-    for (let i = 0; i < words.length; i += maxWordsPerChunk) {
-      chunks.push(words.slice(i, i + maxWordsPerChunk).join(' '));
-    }
-    return chunks;
-  };
-
-  const renderHookCaptions = () => {
-    if (!captions?.enabled || !hookAudio || hookFrames === 0) return null;
-
-    const isHookActive = frame >= hookStartFrame && frame < hookEndFrame;
-    if (!isHookActive) return null;
-
-    // Split hook text into chunks
-    const chunks = getCaptionChunks(hookAudio.text, 8); // Slightly smaller chunks for hook
-    const framesPerChunk = hookFrames / chunks.length;
-    const chunkIndex = Math.floor((frame - hookStartFrame) / framesPerChunk);
-    const safeChunkIndex = Math.max(0, Math.min(chunkIndex, chunks.length - 1));
-
-    return (
-      <div
-        style={{
-          position: 'absolute',
-          bottom: captions.position === 'bottom' ? '10%' : captions.position === 'top' ? '80%' : '45%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          color: captions.color || '#ffffff',
-          fontFamily: captions.font || 'Inter, sans-serif',
-          fontSize: '52px', // Slightly larger for hook impact
-          fontWeight: 'bold',
-          textAlign: 'center',
-          textShadow: '3px 3px 6px rgba(0,0,0,0.9)',
-          maxWidth: '85%',
-          lineHeight: 1.2,
-          background: 'rgba(0,0,0,0.5)',
-          borderRadius: '12px',
-          padding: '0.3em 0.7em'
-        }}
-      >
-        {chunks[safeChunkIndex]}
-      </div>
-    );
-  };
-
-  const renderCaptions = () => {
-    if (!captions?.enabled) return null;
-
-    // Find current segment based on main content timing
-    const frameInMainContent = frame - mainContentStartFrame;
-    if (frameInMainContent < 0) return null;
-
-    let currentTime = 0; // in milliseconds
-    let currentSegmentIndex = -1;
-
-    for (let i = 0; i < audioSegments.length; i++) {
-      // Add chapter marker time
-      if (chapterMarkers[i]) {
-        currentTime += CHAPTER_MARKER_DURATION * 1000;
-      }
-      
-      const segmentStartTime = currentTime;
-      const segmentEndTime = currentTime + audioSegments[i].duration;
-      const segmentStartFrame = Math.round((segmentStartTime / 1000) * fps);
-      const segmentEndFrame = Math.round((segmentEndTime / 1000) * fps);
-      
-      if (frameInMainContent >= segmentStartFrame && frameInMainContent < segmentEndFrame) {
-        currentSegmentIndex = i;
-        break;
-      }
-      
-      currentTime += audioSegments[i].duration;
-    }
-
-    if (currentSegmentIndex === -1) return null;
-
-    const currentSegment = audioSegments[currentSegmentIndex];
-    
-    // Calculate segment timing for caption chunking
-    let segmentStartTime = 0;
-    for (let i = 0; i < currentSegmentIndex; i++) {
-      if (chapterMarkers[i]) {
-        segmentStartTime += CHAPTER_MARKER_DURATION * 1000;
-      }
-      segmentStartTime += audioSegments[i].duration;
-    }
-    if (chapterMarkers[currentSegmentIndex]) {
-      segmentStartTime += CHAPTER_MARKER_DURATION * 1000;
-    }
-    
-    const segmentStartFrame = Math.round((segmentStartTime / 1000) * fps);
-    const segmentDuration = currentSegment.duration;
-    const segmentFrames = Math.round((segmentDuration / 1000) * fps);
-
-    // Split caption into chunks
-    const chunks = getCaptionChunks(currentSegment.text, 10);
-    const framesPerChunk = segmentFrames / chunks.length;
-    const chunkIndex = Math.floor((frameInMainContent - segmentStartFrame) / framesPerChunk);
-    const safeChunkIndex = Math.max(0, Math.min(chunkIndex, chunks.length - 1));
-
-    return (
-      <div
-        style={{
-          position: 'absolute',
-          bottom: captions.position === 'bottom' ? '10%' : captions.position === 'top' ? '80%' : '45%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          color: captions.color || '#ffffff',
-          fontFamily: captions.font || 'Inter, sans-serif',
-          fontSize: '48px',
-          fontWeight: 'bold',
-          textAlign: 'center',
-          textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-          maxWidth: '80%',
-          lineHeight: 1.2,
-          background: 'rgba(0,0,0,0.4)',
-          borderRadius: '12px',
-          padding: '0.2em 0.6em'
-        }}
-      >
-        {chunks[safeChunkIndex]}
-      </div>
-    );
-  };
-
-  const renderWatermark = () => {
+  // Memoize watermark styles
+  const watermarkStyle = useMemo(() => {
     if (!watermark) return null;
 
     const position = watermark.position || 'bottom-right';
@@ -723,36 +454,256 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         break;
     }
 
-    return (
-      <Img
-        src={watermark.url}
-        style={style}
-      />
-    );
-  };
+    return style;
+  }, [watermark]);
 
-  const renderChapterMarker = (markerIndex: number) => {
+  const renderTitle = useCallback(() => {
+    const isTitleActive = frame >= timingData.titleStartFrame && frame < timingData.titleEndFrame;
+    if (!isTitleActive) return null;
+
+    const fadeFrames = fps * 0.5;
+    const localFrame = frame - timingData.titleStartFrame;
+    const fadeIn = Math.min(1, localFrame / fadeFrames);
+    const fadeOut = Math.min(1, (timingData.titleFrames - localFrame) / fadeFrames);
+    const opacity = Math.min(fadeIn, fadeOut);
+
+    const scaleProgress = localFrame / timingData.titleFrames;
+    const scale = interpolate(scaleProgress, [0, 0.2, 0.8, 1], [0.8, 1.05, 1.02, 1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp'
+    });
+
+    return (
+      <AbsoluteFill key="title-screen">
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: title.bgColor,
+            opacity,
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: \`translate(-50%, -50%) scale(\${scale})\`,
+            color: title.color,
+            fontFamily: title.font,
+            fontSize: '84px',
+            fontWeight: '900',
+            textAlign: 'center',
+            textShadow: '0 4px 20px rgba(0,0,0,0.8), 0 0 40px rgba(255,255,255,0.2)',
+            maxWidth: '90%',
+            lineHeight: 1.1,
+            opacity,
+          }}
+        >
+          {title.text}
+        </div>
+      </AbsoluteFill>
+    );
+  }, [frame, timingData, fps, title]);
+
+  const renderHookImages = useCallback(() => {
+    if (!hookAudio || timingData.hookFrames === 0) return null;
+
+    const isHookActive = frame >= timingData.hookStartFrame && frame < timingData.hookEndFrame;
+    if (!isHookActive) return null;
+
+    const hookImageCount = Math.min(4, images.length);
+    const framesPerHookImage = timingData.hookFrames / hookImageCount;
+    const currentHookImageIndex = Math.floor((frame - timingData.hookStartFrame) / framesPerHookImage);
+    const safeHookImageIndex = Math.max(0, Math.min(currentHookImageIndex, hookImageCount - 1));
+    const currentHookImage = images[safeHookImageIndex];
+
+    if (!currentHookImage) return null;
+
+    const imageStartFrame = timingData.hookStartFrame + (safeHookImageIndex * framesPerHookImage);
+    const imageEndFrame = imageStartFrame + framesPerHookImage;
+    const imageProgress = (frame - imageStartFrame) / (imageEndFrame - imageStartFrame);
+
+    const kenBurnsScale = effects?.kenBurns ?
+      interpolate(imageProgress, [0, 1], [1.1, 1.3]) : 1;
+
+    return (
+      <AbsoluteFill key={\`hook-image-\${safeHookImageIndex}\`}>
+        <Img
+          src={currentHookImage.filename}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: \`scale(\${kenBurnsScale})\`,
+            transformOrigin: 'center center',
+          }}
+        />
+        {renderEffects()}
+      </AbsoluteFill>
+    );
+  }, [frame, timingData, hookAudio, images, effects]);
+
+  // Extract effects rendering to avoid duplication
+  const renderEffects = useCallback(() => (
+    <>
+      {effects?.fog && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))',
+            opacity: effects.fogIntensity || 0.3,
+            pointerEvents: 'none'
+          }}
+        />
+      )}
+      {effects?.filmGrain && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: \`url('\${FILM_GRAIN_SVG}')\`,
+            opacity: 0.1,
+            pointerEvents: 'none'
+          }}
+        />
+      )}
+    </>
+  ), [effects]);
+
+  const renderImage = useCallback((image: any, index: number) => {
+    const timing = segmentTimings[index];
+    if (!timing) return null;
+
+    const isActive = frame >= timing.startFrame && frame < timing.endFrame;
+    if (!isActive) return null;
+
+    const segmentProgress = (frame - timing.startFrame) / (timing.endFrame - timing.startFrame);
+    const kenBurnsScale = effects?.kenBurns ?
+      interpolate(segmentProgress, [0, 1], [1, 1.2]) : 1;
+
+    return (
+      <AbsoluteFill key={\`image-\${index}\`}>
+        <Img
+          src={image.filename}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: \`scale(\${kenBurnsScale})\`,
+            transformOrigin: 'center center',
+          }}
+        />
+        {renderEffects()}
+      </AbsoluteFill>
+    );
+  }, [frame, segmentTimings, effects, renderEffects]);
+
+  const renderCaptions = useCallback(() => {
+    if (!captions?.enabled || activeSegmentIndex === -1) return null;
+
+    const currentSegment = audioSegments[activeSegmentIndex];
+    const timing = segmentTimings[activeSegmentIndex];
+    const chunks = captionChunks.segments[activeSegmentIndex];
+
+    if (!chunks || chunks.length === 0) return null;
+
+    const segmentFrames = timing.endFrame - timing.startFrame;
+    const framesPerChunk = segmentFrames / chunks.length;
+    const frameInMainContent = frame - timingData.mainContentStartFrame;
+    const chunkIndex = Math.floor((frameInMainContent - (timing.startFrame - timingData.mainContentStartFrame)) / framesPerChunk);
+    const safeChunkIndex = Math.max(0, Math.min(chunkIndex, chunks.length - 1));
+
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          bottom: captions.position === 'bottom' ? '10%' : captions.position === 'top' ? '80%' : '45%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          color: captions.color || '#ffffff',
+          fontFamily: captions.font || 'Inter, sans-serif',
+          fontSize: '48px',
+          fontWeight: 'bold',
+          textAlign: 'center',
+          textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+          maxWidth: '80%',
+          lineHeight: 1.2,
+          background: 'rgba(0,0,0,0.4)',
+          borderRadius: '12px',
+          padding: '0.2em 0.6em'
+        }}
+      >
+        {chunks[safeChunkIndex]}
+      </div>
+    );
+  }, [captions, activeSegmentIndex, audioSegments, segmentTimings, captionChunks, frame, timingData]);
+
+  const renderHookCaptions = useCallback(() => {
+    if (!captions?.enabled || !hookAudio || timingData.hookFrames === 0) return null;
+
+    const isHookActive = frame >= timingData.hookStartFrame && frame < timingData.hookEndFrame;
+    if (!isHookActive) return null;
+
+    const chunks = captionChunks.hook;
+    const framesPerChunk = timingData.hookFrames / chunks.length;
+    const chunkIndex = Math.floor((frame - timingData.hookStartFrame) / framesPerChunk);
+    const safeChunkIndex = Math.max(0, Math.min(chunkIndex, chunks.length - 1));
+
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          bottom: captions.position === 'bottom' ? '10%' : captions.position === 'top' ? '80%' : '45%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          color: captions.color || '#ffffff',
+          fontFamily: captions.font || 'Inter, sans-serif',
+          fontSize: '52px',
+          fontWeight: 'bold',
+          textAlign: 'center',
+          textShadow: '3px 3px 6px rgba(0,0,0,0.9)',
+          maxWidth: '85%',
+          lineHeight: 1.2,
+          background: 'rgba(0,0,0,0.5)',
+          borderRadius: '12px',
+          padding: '0.3em 0.7em'
+        }}
+      >
+        {chunks[safeChunkIndex]}
+      </div>
+    );
+  }, [captions, hookAudio, timingData, frame, captionChunks]);
+
+  const renderChapterMarker = useCallback((markerIndex: number) => {
     const marker = chapterMarkers[markerIndex];
     if (!marker) return null;
 
-    // Calculate when this chapter marker should appear
-    let markerStartTime = 0; // in milliseconds
-    
-    // Add time from previous segments and their chapter markers
+    let markerStartTime = 0;
+
     for (let i = 0; i < markerIndex; i++) {
       if (chapterMarkers[i]) {
-        markerStartTime += CHAPTER_MARKER_DURATION * 1000;
+        markerStartTime += timingData.CHAPTER_MARKER_DURATION * 1000;
       }
       markerStartTime += audioSegments[i]?.duration || 0;
     }
-    
-    const markerStartFrame = mainContentStartFrame + Math.round((markerStartTime / 1000) * fps);
-    const markerDuration = Math.round(CHAPTER_MARKER_DURATION * fps);
-    
+
+    const markerStartFrame = timingData.mainContentStartFrame + Math.round((markerStartTime / 1000) * fps);
+    const markerDuration = Math.round(timingData.CHAPTER_MARKER_DURATION * fps);
+
     const localFrame = frame - markerStartFrame;
     if (localFrame < 0 || localFrame >= markerDuration) return null;
-    
-    // Fade in/out
+
     const fadeInFrames = fps * 0.5;
     const fadeOutFrames = fps * 0.5;
     const fadeIn = Math.min(1, localFrame / fadeInFrames);
@@ -795,116 +746,113 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         </div>
       </AbsoluteFill>
     );
-  };
+  }, [chapterMarkers, timingData, audioSegments, fps, frame, chapterMarkerBgColor, chapterMarkerFontColor, chapterMarkerFont]);
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
-      {/* 0. Title Screen - appears first */}
+      {/* Title Screen */}
       {renderTitle()}
 
-      {/* 1. Hook Video - appears first */}
+      {/* Hook Content */}
       {hookAudio && (
         <>
           {renderHookImages()}
           {renderHookCaptions()}
-          <Sequence from={hookStartFrame} durationInFrames={hookFrames}>
+          <Sequence from={timingData.hookStartFrame} durationInFrames={timingData.hookFrames}>
             <Audio src={hookAudio.filename} />
           </Sequence>
         </>
       )}
 
-      {/* 2. Intro Video */}
+      {/* Intro Video */}
       {intro && (
-        <Sequence from={introStartFrame} durationInFrames={introFrames}>
+        <Sequence from={timingData.introStartFrame} durationInFrames={timingData.introFrames}>
           <div style={{
             opacity: !intro.dissolveTime ? 1 : (() => {
               const dissolveFrames = Math.round(intro.dissolveTime * fps);
-              const fadeInEnd = Math.min(introStartFrame + dissolveFrames, introEndFrame - 1);
-              const fadeOutStart = Math.max(introEndFrame - dissolveFrames, introStartFrame + 1);
+              const fadeInEnd = Math.min(timingData.introStartFrame + dissolveFrames, timingData.introEndFrame - 1);
+              const fadeOutStart = Math.max(timingData.introEndFrame - dissolveFrames, timingData.introStartFrame + 1);
 
-              // Ensure we have valid ranges
               if (fadeInEnd >= fadeOutStart) {
-                // If dissolve time is too long, just use simple fade
-                return interpolate(frame, [introStartFrame, introEndFrame], [0, 1]);
+                return interpolate(frame, [timingData.introStartFrame, timingData.introEndFrame], [0, 1]);
               }
-              
-              return interpolate(frame, 
-                [introStartFrame, fadeInEnd, fadeOutStart, introEndFrame], 
+
+              return interpolate(frame,
+                [timingData.introStartFrame, fadeInEnd, fadeOutStart, timingData.introEndFrame],
                 [0, 1, 1, 0],
                 { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
               );
-            })()
+            })(),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            height: '100%',
           }}>
             <MyVideoComponent src={intro.url} />
           </div>
         </Sequence>
       )}
 
-      {/* 3. Main Content - Images */}
-      {frame >= mainContentStartFrame && frame < mainContentEndFrame && (
+      {/* Main Content */}
+      {frame >= timingData.mainContentStartFrame && frame < timingData.mainContentEndFrame && (
         <div style={{
-          opacity: !outro?.dissolveTime ? undefined : frame < mainContentEndFrame - (outro.dissolveTime * fps) ? 1 : 
-            interpolate(frame, [mainContentEndFrame - (outro.dissolveTime * fps), mainContentEndFrame], [1, 0])
+          opacity: !outro?.dissolveTime ? undefined : frame < timingData.mainContentEndFrame - (outro.dissolveTime * fps) ? 1 :
+            interpolate(frame, [timingData.mainContentEndFrame - (outro.dissolveTime * fps), timingData.mainContentEndFrame], [1, 0])
         }}>
           {images.map((image, index) => renderImage(image, index))}
           {renderCaptions()}
         </div>
       )}
 
-      {/* 4. Chapter Markers */}
+      {/* Chapter Markers */}
       {chapterMarkers.map((_, index) => renderChapterMarker(index))}
 
-      {/* 5. Audio Segments */}
+      {/* Audio Segments */}
       {audioSegments.map((segment, index) => {
-        let audioStartTime = 0;
-        
-        // Add time from previous segments and chapter markers
-        for (let i = 0; i < index; i++) {
-          if (chapterMarkers[i]) {
-            audioStartTime += CHAPTER_MARKER_DURATION * 1000;
-          }
-          audioStartTime += audioSegments[i].duration;
-        }
-        
-        // Add current chapter marker time
-        if (chapterMarkers[index]) {
-          audioStartTime += CHAPTER_MARKER_DURATION * 1000;
-        }
-        
-        const audioStartFrame = mainContentStartFrame + Math.round((audioStartTime / 1000) * fps);
-        
+        const timing = segmentTimings[index];
         return (
-          <Sequence key={\`audio-\${index}\`} from={audioStartFrame}>
+          <Sequence key={\`audio-\${index}\`} from={timing.startFrame}>
             <Audio src={segment.filename} />
           </Sequence>
         );
       })}
 
-      {/* 6. Background Audio */}
+      {/* Background Audio */}
       {bgAudio && (
-        <Sequence from={mainContentStartFrame}>
+        <Sequence from={timingData.mainContentStartFrame}>
           <Audio src={bgAudio} volume={0.3} />
         </Sequence>
       )}
 
-      {/* 7. Outro Video */}
+      {/* Outro Video */}
       {outro && (
-        <Sequence from={outroStartFrame} durationInFrames={outroFrames}>
+        <Sequence from={timingData.outroStartFrame} durationInFrames={timingData.outroFrames}>
           <div style={{
-            opacity: !outro.dissolveTime ? undefined : interpolate(frame, [0, fps * outro.dissolveTime], [0, 1])
+            opacity: !outro.dissolveTime ? undefined : interpolate(frame, [0, fps * outro.dissolveTime], [0, 1]),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            height: '100%',
           }}>
             <MyVideoComponent src={outro.url} />
           </div>
         </Sequence>
       )}
 
-      {/* 8. Watermark - Always visible */}
-      {renderWatermark()}
+      {/* Watermark */}
+      {watermark && watermarkStyle && (
+        <Img
+          src={watermark.url}
+          style={watermarkStyle}
+        />
+      )}
     </AbsoluteFill>
   );
 };
 
-const MyVideoComponent = ({ src }: { src: string }) => {
+const MyVideoComponent = React.memo(({ src }: { src: string }) => {
   const [handle] = useState(() => delayRender());
 
   useEffect(() => {
@@ -912,14 +860,23 @@ const MyVideoComponent = ({ src }: { src: string }) => {
     video.src = src;
     video.onloadeddata = () => continueRender(handle);
     video.onerror = () => continueRender(handle);
-    
+
     return () => {
       video.remove();
     };
   }, [src, handle]);
 
-  return <Video src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
-};`;
+  return (
+    <Video
+      src={src}
+      style={{
+        width: '100%',
+        height: 'auto',
+        aspectRatio: '16 / 9'
+      }}
+    />
+  );
+});`;
 
     await fs.writeFile(path.join(compositionsDir, 'StoryVideo.tsx'), storyVideoContent);
   }
