@@ -6,38 +6,40 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  Play, 
-  ExternalLink, 
-  Download, 
-  Eye, 
-  Clock, 
-  CheckCircle, 
+import {
+  Play,
+  ExternalLink,
+  Download,
+  Eye,
+  Clock,
+  CheckCircle,
   AlertCircle,
   Filter,
-  Calendar
+  Calendar,
+  Trash2
 } from "lucide-react";
 import VideoPreview from "@/components/video-preview";
 import type { Video, Channel, VideoTemplate } from "@shared/schema";
@@ -59,6 +61,8 @@ export default function Videos() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [scheduleVideo, setScheduleVideo] = useState<VideoWithDetails | null>(null);
   const [scheduledAt, setScheduledAt] = useState<string>("");
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [videoToDelete, setVideoToDelete] = useState<VideoWithDetails | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -107,6 +111,11 @@ export default function Videos() {
     const id = videoUrl.split('_')[1].split('.')[0];
     window.open(`/api/videos/${id}/download`, '_blank');
   }
+
+  const handleDeleteVideo = (video: VideoWithDetails) => {
+    setVideoToDelete(video);
+    setDeleteModalOpen(true);
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -179,9 +188,39 @@ export default function Videos() {
       setScheduleVideo(null);
       setScheduledAt("");
       refetch();
+      toast({
+        title: "Video scheduled successfully",
+        description: "The video has been scheduled for publication."
+      });
     },
     onError: () => {
       toast({ title: "Failed to schedule video", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (videoId: number) => {
+      const res = await fetch(`/api/videos/${videoId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete video");
+      return res.json();
+    },
+    onSuccess: () => {
+      setDeleteModalOpen(false);
+      setVideoToDelete(null);
+      refetch();
+      toast({
+        title: "Video deleted successfully",
+        description: "The video has been permanently removed."
+      });
+    },
+    onError: (e) => {
+      toast({
+        title: "Failed to delete video",
+        description: e.message || "Unknown error",
+        variant: "destructive"
+      });
     },
   });
 
@@ -235,7 +274,7 @@ export default function Videos() {
             <Filter className="w-4 h-4 text-muted-foreground" />
             <span className="text-sm font-medium">Filters:</span>
           </div>
-          
+
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="All Status" />
@@ -405,6 +444,15 @@ export default function Videos() {
                               >
                                 <Calendar className="h-4 w-4" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="Delete Video"
+                                onClick={() => handleDeleteVideo(video)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -430,6 +478,7 @@ export default function Videos() {
         />
       )}
 
+      {/* Schedule Video Dialog */}
       <Dialog open={scheduleModalOpen} onOpenChange={setScheduleModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -445,19 +494,65 @@ export default function Videos() {
               onChange={e => setScheduledAt(e.target.value)}
               min={new Date().toISOString().slice(0, 16)}
             />
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setScheduleModalOpen(false)}
+                disabled={scheduleMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (scheduleVideo && scheduledAt) {
+                    scheduleMutation.mutate({ videoId: scheduleVideo.id, scheduledAt });
+                  }
+                }}
+                disabled={!scheduledAt || scheduleMutation.isPending}
+              >
+                {scheduleMutation.isPending ? "Scheduling..." : "Schedule"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Video</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{videoToDelete?.title}"? This action cannot be undone.
+              {videoToDelete?.status === 'published' && (
+                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                  <strong>Warning:</strong> This video is already published on YouTube. Deleting it here will not remove it from YouTube.
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
             <Button
+              variant="outline"
+              onClick={() => setDeleteModalOpen(false)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
               onClick={() => {
-                if (scheduleVideo && scheduledAt) {
-                  scheduleMutation.mutate({ videoId: scheduleVideo.id, scheduledAt });
+                if (videoToDelete) {
+                  deleteMutation.mutate(videoToDelete.id);
                 }
               }}
-              disabled={!scheduledAt || scheduleMutation.isPending}
+              disabled={deleteMutation.isPending}
             >
-              {scheduleMutation.isPending ? "Scheduling..." : "Schedule"}
+              {deleteMutation.isPending ? "Deleting..." : "Delete Video"}
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
   );
-} 
+}

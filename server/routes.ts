@@ -456,6 +456,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/videos/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const video = await storage.getVideo(id);
+
+      if (!video) {
+        return res.status(404).json({ message: "Video not found" });
+      }
+
+      // Attempt to delete video and thumbnail files if they exist
+      const filesToDelete: string[] = [];
+      if (video.videoUrl) {
+        filesToDelete.push(video.videoUrl);
+      }
+      if (video.thumbnailUrl) {
+        filesToDelete.push(video.thumbnailUrl);
+      }
+
+      for (const filePath of filesToDelete) {
+        try {
+          // If the path is not absolute, resolve relative to process.cwd()
+          const absPath = path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+          await fs.unlink(absPath);
+        } catch (err) {
+          // Ignore file not found errors, log others
+          if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+            console.warn(`Failed to delete file ${filePath}:`, err);
+          }
+        }
+      }
+
+      const deleted = await storage.deleteVideo(id);
+      if (deleted) {
+        res.status(200).send();
+      } else {
+        res.status(404).json({ message: "Video not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: `Failed to delete video: ${(error as Error).message}`});
+    }
+  });
+
   app.post("/api/videos/test/:channelId", async (req, res) => {
     try {
       const channelId = parseInt(req.params.channelId);
