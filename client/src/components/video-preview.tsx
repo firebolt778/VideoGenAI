@@ -122,7 +122,7 @@ export default function VideoPreview({ video, isOpen, onClose }: VideoPreviewPro
                       variant="outline"
                       size="sm"
                       className="w-full justify-start"
-                      onClick={() => window.open(video.thumbnailUrl || '', '_blank')}
+                      onClick={() => window.open(`${window.location.origin}/api/thumbnails/${video.id}` || '', '_blank')}
                     >
                       <Eye className="w-4 h-4 mr-2" />
                       View Thumbnail

@@ -995,7 +995,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch ElevenLabs voices" });
     }
-  })
+  });
+
+  // Preview the image
+  app.get("/api/thumbnails/:id", async (req, res) => {
+    try {
+      const thumbnailId = parseInt(req.params.id);
+      const thumbnailPath = path.resolve('thumbnails', `thumbnail_${thumbnailId}.jpg`);
+
+      // Check if file exists
+      if (!fsSync.existsSync(thumbnailPath)) {
+        return res.status(404).json({ message: "Thumbnail file not found on disk" });
+      }
+
+      // Set headers for image preview
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Content-Disposition', `inline; filename="thumbnail_${thumbnailId}.jpg"`);
+
+      // Stream the file
+      const fileStream = fsSync.createReadStream(thumbnailPath);
+      fileStream.pipe(res);
+    } catch (error) {
+      console.error('Video download error:', error);
+      res.status(500).json({ message: "Failed to download video" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
