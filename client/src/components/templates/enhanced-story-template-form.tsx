@@ -83,7 +83,7 @@ export default function EnhancedStoryTemplateForm({
 }: EnhancedStoryTemplateFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedVoices, setSelectedVoices] = useState<string[]>([]);
+  const [selectedVoices, setSelectedVoices] = useState<string[]>(template?.audioVoices || []);
   const isEditing = !!template;
 
   const { data: elevenVoices } = useQuery<ElevenLabsVoice[]>({
