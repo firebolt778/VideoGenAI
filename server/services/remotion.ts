@@ -209,7 +209,7 @@ export const RemotionVideo: React.FC = () => {
 
     const storyVideoContent = `
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { delayRender, continueRender, useCurrentFrame, useVideoConfig, Img, Audio, AbsoluteFill, Sequence, interpolate, Video } from 'remotion';
+import { delayRender, continueRender, useCurrentFrame, useVideoConfig, Img, Audio, AbsoluteFill, Sequence, interpolate, OffthreadVideo } from 'remotion';
 
 interface StoryVideoProps {
   title: {
@@ -379,22 +379,37 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     });
   }, [audioSegments, chapterMarkers, timingData, fps]);
 
+  // Audio duration estimation function
+  const estimateAudioDuration = useCallback((text: string): number => {
+    // Rough estimation: ~150 words per minute, ~5 characters per word
+    const wordsPerMinute = 150;
+    const charactersPerWord = 5;
+    const words = text.length / charactersPerWord;
+    const minutes = words / wordsPerMinute;
+    return Math.round(minutes * 60 * 1000); // Return milliseconds
+  }, []);
+
   // Memoize caption chunks to avoid recalculation
   const captionChunks = useMemo(() => {
     const getCaptionChunks = (text: string, maxWordsPerChunk = 10) => {
       const words = text.split(' ');
       const chunks: string[] = [];
+      const chunkDurations: number[] = [];
+
       for (let i = 0; i < words.length; i += maxWordsPerChunk) {
-        chunks.push(words.slice(i, i + maxWordsPerChunk).join(' '));
+        const chunk = words.slice(i, i + maxWordsPerChunk).join(' ');
+        chunks.push(chunk);
+        chunkDurations.push(estimateAudioDuration(chunk));
       }
-      return chunks;
+
+      return { chunks, durations: chunkDurations };
     };
 
     return {
-      hook: hookAudio ? getCaptionChunks(hookAudio.text, 8) : [],
-      segments: audioSegments.map(segment => getCaptionChunks(segment.text, 10)),
+      hook: hookAudio ? getCaptionChunks(hookAudio.text) : { chunks: [], durations: [] },
+      segments: audioSegments.map(segment => getCaptionChunks(segment.text)),
     };
-  }, [hookAudio, audioSegments]);
+  }, [hookAudio, audioSegments, estimateAudioDuration]);
 
   // Find current active segment more efficiently
   const activeSegmentIndex = useMemo(() => {
@@ -615,15 +630,27 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
 
     const currentSegment = audioSegments[activeSegmentIndex];
     const timing = segmentTimings[activeSegmentIndex];
-    const chunks = captionChunks.segments[activeSegmentIndex];
+    const captionData = captionChunks.segments[activeSegmentIndex];
 
-    if (!chunks || chunks.length === 0) return null;
+    if (!captionData || captionData.chunks.length === 0) return null;
 
-    const segmentFrames = timing.endFrame - timing.startFrame;
-    const framesPerChunk = segmentFrames / chunks.length;
-    const frameInMainContent = frame - timingData.mainContentStartFrame;
-    const chunkIndex = Math.floor((frameInMainContent - (timing.startFrame - timingData.mainContentStartFrame)) / framesPerChunk);
-    const safeChunkIndex = Math.max(0, Math.min(chunkIndex, chunks.length - 1));
+    // Calculate which chunk should be displayed based on audio timing
+    const frameInSegment = frame - timing.startFrame;
+    const timeInSegmentMs = (frameInSegment / fps) * 1000;
+
+    let accumulatedTime = 0;
+    let chunkIndex = 0;
+
+    for (let i = 0; i < captionData.durations.length; i++) {
+      if (timeInSegmentMs >= accumulatedTime && timeInSegmentMs < accumulatedTime + captionData.durations[i]) {
+        chunkIndex = i;
+        break;
+      }
+      accumulatedTime += captionData.durations[i];
+      chunkIndex = i + 1; // If we're past all chunks, show the last one
+    }
+
+    const safeChunkIndex = Math.max(0, Math.min(chunkIndex, captionData.chunks.length - 1));
 
     return (
       <div
@@ -645,10 +672,10 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
           padding: '0.2em 0.6em'
         }}
       >
-        {chunks[safeChunkIndex]}
+        {captionData.chunks[safeChunkIndex]}
       </div>
     );
-  }, [captions, activeSegmentIndex, audioSegments, segmentTimings, captionChunks, frame, timingData]);
+  }, [captions, activeSegmentIndex, audioSegments, segmentTimings, captionChunks, frame, timingData, fps]);
 
   const renderHookCaptions = useCallback(() => {
     if (!captions?.enabled || !hookAudio || timingData.hookFrames === 0) return null;
@@ -656,10 +683,26 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     const isHookActive = frame >= timingData.hookStartFrame && frame < timingData.hookEndFrame;
     if (!isHookActive) return null;
 
-    const chunks = captionChunks.hook;
-    const framesPerChunk = timingData.hookFrames / chunks.length;
-    const chunkIndex = Math.floor((frame - timingData.hookStartFrame) / framesPerChunk);
-    const safeChunkIndex = Math.max(0, Math.min(chunkIndex, chunks.length - 1));
+    const captionData = captionChunks.hook;
+    if (!captionData || captionData.chunks.length === 0) return null;
+
+    // Calculate which chunk should be displayed based on audio timing
+    const frameInHook = frame - timingData.hookStartFrame;
+    const timeInHookMs = (frameInHook / fps) * 1000;
+
+    let accumulatedTime = 0;
+    let chunkIndex = 0;
+
+    for (let i = 0; i < captionData.durations.length; i++) {
+      if (timeInHookMs >= accumulatedTime && timeInHookMs < accumulatedTime + captionData.durations[i]) {
+        chunkIndex = i;
+        break;
+      }
+      accumulatedTime += captionData.durations[i];
+      chunkIndex = i + 1; // If we're past all chunks, show the last one
+    }
+
+    const safeChunkIndex = Math.max(0, Math.min(chunkIndex, captionData.chunks.length - 1));
 
     return (
       <div
@@ -681,10 +724,10 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
           padding: '0.3em 0.7em'
         }}
       >
-        {chunks[safeChunkIndex]}
+        {captionData.chunks[safeChunkIndex]}
       </div>
     );
-  }, [captions, hookAudio, timingData, frame, captionChunks]);
+  }, [captions, hookAudio, timingData, frame, captionChunks, fps]);
 
   const renderChapterMarker = useCallback((markerIndex: number) => {
     const marker = chapterMarkers[markerIndex];
@@ -787,7 +830,11 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
             width: '100%',
             height: '100%',
           }}>
-            <MyVideoComponent src={intro.url} />
+            <MyVideoComponent
+              src={intro.url}
+              fadeOutDuration={intro.duration > 5 ? 5 : intro.duration}
+              totalDuration={intro.duration}
+            />
           </div>
         </Sequence>
       )}
@@ -837,7 +884,11 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
             width: '100%',
             height: '100%',
           }}>
-            <MyVideoComponent src={outro.url} />
+            <MyVideoComponent
+              src={outro.url}
+              fadeOutDuration={outro.duration > 5 ? 5 : outro.duration}
+              totalDuration={outro.duration}
+            />
           </div>
         </Sequence>
       )}
@@ -853,8 +904,17 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   );
 };
 
-const MyVideoComponent = React.memo(({ src }: { src: string }) => {
+const MyVideoComponent = React.memo(({
+  src,
+  fadeOutDuration = 0, // Duration in seconds for fade out
+  totalDuration // Total duration of the video in the sequence
+}: {
+  src: string;
+  fadeOutDuration?: number;
+  totalDuration?: number;
+}) => {
   const [handle] = useState(() => delayRender());
+  const { fps } = useVideoConfig();
 
   useEffect(() => {
     const video = document.createElement('video');
@@ -867,9 +927,30 @@ const MyVideoComponent = React.memo(({ src }: { src: string }) => {
     };
   }, [src, handle]);
 
+  const volume = useMemo(() => {
+    if (!totalDuration || !fadeOutDuration) {
+      return undefined;
+    }
+    return (frame: number) => {
+      const fadeStart = Math.max(0, Math.round((totalDuration - fadeOutDuration) * fps));
+      const fadeEnd = Math.round(Math.max(0, totalDuration - 1) * fps);
+
+      return interpolate(
+        frame,
+        [fadeStart, fadeEnd],
+        [1, 0],
+        {
+          extrapolateLeft: 'clamp',
+          extrapolateRight: 'clamp',
+        }
+      );
+    }
+  }, [totalDuration, fadeOutDuration])
+
   return (
-    <Video
+    <OffthreadVideo
       src={src}
+      volume={volume}
       style={{
         width: '100%',
         height: 'auto',
