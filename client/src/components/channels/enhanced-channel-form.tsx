@@ -632,6 +632,27 @@ export default function EnhancedChannelForm({
                         </FormItem>
                       )}
                     />
+
+                    {/* Preview Panel for Title */}
+                    <div className="mt-4 col-span-full">
+                      <FormLabel>Text Preview</FormLabel>
+                      <div
+                        className="rounded-lg p-4 mt-2 border"
+                        style={{
+                          backgroundColor: form.watch("chapterMarkerBgColor") || "#000000",
+                        }}
+                      >
+                        <div
+                          className="text-4xl font-semibold text-center"
+                          style={{
+                            color: form.watch("chapterMarkerFontColor") || "#FFFFFF",
+                            fontFamily: form.watch("chapterMarkerFont") || "Arial",
+                          }}
+                        >
+                          Sample Text
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
