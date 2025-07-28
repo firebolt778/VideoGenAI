@@ -344,10 +344,8 @@ const AiResponse = ({ videoId }: { videoId: number }) => {
     try {
       const response = await fetch(`/api/logs/${videoId}/${type}`);
       let text = await response.json() as string;
-      if (type === "outline") {
-        text = text.replaceAll("\n", "<br />");
-        text = text.replaceAll("  ", "&nbsp;&nbsp;");
-      }
+      text = text.replaceAll("\n", "<br />");
+      text = text.replaceAll("  ", "&nbsp;&nbsp;");
       setContent(text);
     } catch (e) {
       console.error(e);
@@ -382,19 +380,19 @@ const AiResponse = ({ videoId }: { videoId: number }) => {
         </TabsList>
         <div className="rounded p-3 bg-muted mt-1">
           <TabsContent value="idea" className="space-y-6">
-            {content}
+            <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
           <TabsContent value="outline" className="space-y-6 overflow-auto">
             <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
           <TabsContent value="fullScript" className="space-y-6">
-            {content}
+            <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
           <TabsContent value="hook" className="space-y-6">
-            {content}
+            <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
           <TabsContent value="images" className="space-y-6">
-            {content}
+            <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
         </div>
       </Tabs>
