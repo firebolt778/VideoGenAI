@@ -119,16 +119,14 @@ ${outline}
     }
   }
 
-  async generateScriptForChapter(outline: StoryOutline, chapter: { name: string, description: string }, previousScript?: string, videoLength?: number): Promise<string> {
+  async generateScriptForChapter(outline: StoryOutline, chapter: { name: string, description: string }, previousScript?: string, videoLength?: number, customPrompt?: string): Promise<string> {
     const len = (videoLength || 60) / outline.chapters.length;
-    const prompt = `
+    let prompt = customPrompt || `
 Write a spoken-word script for a YouTube video chapter. The tone should be natural, engaging, and suited for voiceover narration—imagine someone speaking directly to the audience.
 
 Here’s the context:
 Title: ${outline.title}
 Summary: ${outline.summary}
-Chapter: ${chapter.name} - ${chapter.description}
-${previousScript ? `Previous script:\n${previousScript}\n` : ""}
 
 Guidelines:
 - Use conversational language, as if a person is explaining something to a friend.
@@ -138,6 +136,11 @@ Guidelines:
 - Avoid overly complex or literary phrasing—keep it simple and human.
 - Do **not** include scene directions or camera cues—just spoken narration.
 - End with a sentence that leads naturally into the next chapter (if applicable).
+`;
+    prompt += `
+Here’s the chapter:
+Chapter: ${chapter.name} - ${chapter.description}
+${previousScript ? `Previous script:\n${previousScript}\n` : ""}
 
 Target word count: ${len * 135}-${len * 150} words.
 

@@ -10,6 +10,10 @@ import { validationService } from "./validation";
 import { errorHandlerService } from "./error-handler";
 import type { Channel, VideoTemplate, ThumbnailTemplate, HookTemplate } from "@shared/schema";
 import type { ErrorContext } from "./error-handler";
+import fs from 'fs/promises';
+import path from "path";
+
+const aiResponseDir = path.join(process.cwd(), "ai-response");
 
 export interface VideoGenerationProgress {
   videoId: number;
@@ -62,12 +66,16 @@ export class VideoWorkflowService {
       const hookTemplate = await this.selectRandomHookTemplate(channel);
       const voiceId = await this.selectVoice(template.audioVoices || []);
 
+      const compositionsDir = path.join(aiResponseDir, `${videoId}`)
+      await fs.mkdir(compositionsDir, { recursive: true });
+
       // Step 1: Select and process idea
       const selectedIdea = await this.handleErrorWithRetry(
         () => this.selectIdea(template),
         { videoId, stage: "idea_selection", channelId, templateId: template.id, testMode, retryCount: 0, maxRetries: 3, error: new Error("Initial error"), timestamp: new Date() },
         "openai"
       ) as string;
+      await fs.writeFile(path.join(compositionsDir, 'idea.txt'), selectedIdea);
       await this.logProgress(videoId, "idea_selection", 10, `Selected idea: ${selectedIdea.substring(0, 80)}...`);
 
       // Step 2: Generate story outline
@@ -83,6 +91,7 @@ export class VideoWorkflowService {
         { videoId, stage: "outline", channelId, templateId: template.id, testMode, retryCount: 0, maxRetries: 3, error: new Error("Initial error"), timestamp: new Date() },
         "openai"
       );
+      await fs.writeFile(path.join(compositionsDir, 'outline.txt'), JSON.stringify(structuredClone(outline), undefined, 2));
       context.outline = outline.raw;
       if (outline.chapters.length !== template.imageCount) {
         throw new Error(`OpenAI API Error: The number of chapters is invalid.`);
@@ -94,6 +103,7 @@ export class VideoWorkflowService {
 
       // Step 3: Generate full script
       const { fullScript: script, chapterSegments } = await this.generateScriptAndAssignImages(template, context);
+      await fs.writeFile(path.join(compositionsDir, 'fullScript.txt'), script);
       context.script = script;
       context.title = title;
       await this.logProgress(videoId, "script", 45, "Generated full script");
@@ -102,12 +112,14 @@ export class VideoWorkflowService {
       let hookAudio: AudioSegment | undefined = undefined;
       if (hookTemplate) {
         const hook = await this.generateHook(hookTemplate, context);
+        await fs.writeFile(path.join(compositionsDir, 'hook.txt'), hook);
         hookAudio = await this.generateHookAudio(hookTemplate, hook, voiceId);
         await this.logProgress(videoId, "hook", 50, "Generated video hook");
       }
 
       // Step 5: Generate images
       const images = await this.generateImages(template, context);
+      await fs.writeFile(path.join(compositionsDir, 'images.txt'), JSON.stringify(structuredClone(images), undefined, 2));
       context.images = images.map(img => img.description);
       await this.logProgress(videoId, "images", 60, `Generated ${images.length} images`);
 
@@ -247,6 +259,7 @@ export class VideoWorkflowService {
     let fullScript = "";
     let previousScript = "";
     const chapterSegments: ChapterSegment[] = [];
+    const prompt = ShortcodeProcessor.process(template.chapterStoryPrompt || "", context);
 
     for (let i = 0; i < outline.chapters.length; i++) {
       const chapter = outline.chapters[i];
@@ -254,7 +267,8 @@ export class VideoWorkflowService {
         outline,
         chapter,
         previousScript,
-        template.videoLength || undefined
+        template.videoLength || undefined,
+        prompt,
       );
       fullScript += chapterScript + "\n\n";
       previousScript += chapterScript + "\n\n";

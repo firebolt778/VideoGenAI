@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { TestTube, Play, Download, Eye, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Channel, VideoTemplate } from "@shared/schema";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 interface VideoTestPanelProps {
   channel: Channel;
@@ -290,7 +291,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
 
       {/* Video Preview Modal */}
       <Dialog open={isVideoPreviewOpen} onOpenChange={setIsVideoPreviewOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl max-h-full overflow-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -315,18 +316,88 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
               </video>
             )}
             {currentVideo && (
-              <div className="mt-4 p-4 bg-muted rounded-lg">
-                <h4 className="font-medium mb-2">Video Details</h4>
-                <div className="text-sm space-y-1">
-                  <p><strong>Title:</strong> {currentVideo.title}</p>
-                  <p><strong>Status:</strong> {currentVideo.status}</p>
-                  <p><strong>Created:</strong> {new Date(currentVideo.createdAt).toLocaleString()}</p>
+              <>
+                <div className="mt-4 p-4 bg-muted rounded-lg">
+                  <h4 className="font-medium mb-2">Video Details</h4>
+                  <div className="text-sm space-y-1">
+                    <p><strong>Title:</strong> {currentVideo.title}</p>
+                    <p><strong>Created:</strong> {new Date(currentVideo.createdAt).toLocaleString()}</p>
+                  </div>
                 </div>
-              </div>
+                <h3 className="mt-4">View Logs:</h3>
+                <AiResponse videoId={currentVideo.id} />
+              </>
             )}
           </div>
         </DialogContent>
       </Dialog>
     </Card>
   );
+}
+
+const AiResponse = ({ videoId }: { videoId: number }) => {
+  const [content, setContent] = useState<string>("");
+  const { toast } = useToast();
+
+  const fetchLog = async (type: string) => {
+    setContent("");
+    try {
+      const response = await fetch(`/api/logs/${videoId}/${type}`);
+      let text = await response.json() as string;
+      if (type === "outline") {
+        text = text.replaceAll("\n", "<br />");
+        text = text.replaceAll("  ", "&nbsp;&nbsp;");
+      }
+      setContent(text);
+    } catch (e) {
+      console.error(e);
+      toast({ title: `Failed to fetch AI response: ${(e as Error).message}`, variant: "destructive" });
+    }
+  }
+
+  useEffect(() => {
+    if (!videoId) return;
+    fetchLog("idea");
+  }, [videoId]);
+
+  return (
+    <div className="border rounded-lg p-4 bg-muted/30 mt-2">
+      <Tabs defaultValue="idea" className="w-full" onValueChange={(e) => fetchLog(e)}>
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="idea" className="flex items-center gap-1">
+            Selected Idea
+          </TabsTrigger>
+          <TabsTrigger value="outline" className="flex items-center gap-1">
+            Outline
+          </TabsTrigger>
+          <TabsTrigger value="fullScript" className="flex items-center gap-1">
+            Full Script
+          </TabsTrigger>
+          <TabsTrigger value="hook" className="flex items-center gap-1">
+            Hook
+          </TabsTrigger>
+          <TabsTrigger value="images" className="flex items-center gap-1">
+            Image Prompt
+          </TabsTrigger>
+        </TabsList>
+        <div className="rounded p-3 bg-muted mt-1">
+          <TabsContent value="idea" className="space-y-6">
+            {content}
+          </TabsContent>
+          <TabsContent value="outline" className="space-y-6">
+            {content}
+          </TabsContent>
+          <TabsContent value="fullScript" className="space-y-6">
+            {content}
+          </TabsContent>
+          <TabsContent value="hook" className="space-y-6">
+            {content}
+          </TabsContent>
+          <TabsContent value="images" className="space-y-6">
+            {content}
+          </TabsContent>
+        </div>
+      </Tabs>
+    </div>
+  )
 }

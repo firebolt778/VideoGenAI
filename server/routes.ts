@@ -546,6 +546,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/logs/:videoId/:type", async (req, res) => {
+    try {
+      const videoId = parseInt(req.params.videoId);
+      const type = req.params.type;
+      const filePath = path.join(process.cwd(), "ai-response", videoId.toString(), `${type}.txt`);
+      if (!fsSync.existsSync(filePath)) {
+        return res.status(404).json({ message: `Not found a ${type} of video ${videoId}` });
+      }
+      const logs = await fs.readFile(filePath, "utf-8");
+      res.json(logs);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: `Failed to fetch logs: ${(error as Error).message}` });
+    }
+  });
+
   // File upload endpoint
   app.post("/api/upload", upload.single('file'), async (req, res) => {
     try {

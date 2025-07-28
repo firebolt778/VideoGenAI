@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Download, ExternalLink, Eye } from 'lucide-react';
 import type { Video } from '@shared/schema';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { useToast } from '@/hooks/use-toast';
 
 interface VideoPreviewProps {
   video: Video;
@@ -13,6 +15,25 @@ interface VideoPreviewProps {
 }
 
 export default function VideoPreview({ video, isOpen, onClose }: VideoPreviewProps) {
+  const [content, setContent] = useState<string>("");
+  const { toast } = useToast();
+
+  const fetchLog = async (type: string) => {
+    setContent("");
+    try {
+      const response = await fetch(`/api/logs/${video.id}/${type}`);
+      let text = await response.json() as string;
+      if (type === "outline") {
+        text = text.replaceAll("\n", "<br />");
+        text = text.replaceAll("  ", "&nbsp;&nbsp;");
+      }
+      setContent(text);
+    } catch (e) {
+      console.error(e);
+      toast({ title: `Failed to fetch AI response: ${(e as Error).message}`, variant: "destructive" });
+    }
+  }
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -33,6 +54,11 @@ export default function VideoPreview({ video, isOpen, onClose }: VideoPreviewPro
         return <Badge variant="secondary">{status}</Badge>;
     }
   };
+
+  useEffect(() => {
+    if (!video.id) return;
+    fetchLog("idea");
+  }, [video.id]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -137,10 +163,42 @@ export default function VideoPreview({ video, isOpen, onClose }: VideoPreviewPro
           {video.script && (
             <Card>
               <CardContent className="p-4">
-                <h3 className="font-medium mb-2">Script</h3>
-                <div className="bg-muted p-3 rounded-lg text-sm max-h-40 overflow-y-auto">
-                  {video.script}
-                </div>
+                <Tabs defaultValue="idea" className="w-full" onValueChange={(e) => fetchLog(e)}>
+                  <TabsList className="grid w-full grid-cols-6">
+                    <TabsTrigger value="idea" className="flex items-center gap-1">
+                      Selected Idea
+                    </TabsTrigger>
+                    <TabsTrigger value="outline" className="flex items-center gap-1">
+                      Outline
+                    </TabsTrigger>
+                    <TabsTrigger value="fullScript" className="flex items-center gap-1">
+                      Full Script
+                    </TabsTrigger>
+                    <TabsTrigger value="hook" className="flex items-center gap-1">
+                      Hook
+                    </TabsTrigger>
+                    <TabsTrigger value="images" className="flex items-center gap-1">
+                      Image Prompt
+                    </TabsTrigger>
+                  </TabsList>
+                  <div className="rounded p-3 bg-muted mt-1">
+                    <TabsContent value="idea" className="space-y-6">
+                      {content}
+                    </TabsContent>
+                    <TabsContent value="outline" className="space-y-6 overflow-auto">
+                      <div dangerouslySetInnerHTML={{ __html: content }} />
+                    </TabsContent>
+                    <TabsContent value="fullScript" className="space-y-6">
+                      {content}
+                    </TabsContent>
+                    <TabsContent value="hook" className="space-y-6">
+                      {content}
+                    </TabsContent>
+                    <TabsContent value="images" className="space-y-6">
+                      {content}
+                    </TabsContent>
+                  </div>
+                </Tabs>
               </CardContent>
             </Card>
           )}
