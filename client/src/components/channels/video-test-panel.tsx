@@ -384,8 +384,8 @@ const AiResponse = ({ videoId }: { videoId: number }) => {
           <TabsContent value="idea" className="space-y-6">
             {content}
           </TabsContent>
-          <TabsContent value="outline" className="space-y-6">
-            {content}
+          <TabsContent value="outline" className="space-y-6 overflow-auto">
+            <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
           <TabsContent value="fullScript" className="space-y-6">
             {content}
