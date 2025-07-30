@@ -356,7 +356,7 @@ export default function EnhancedChannelForm({
                     <input
                       id="logo-upload"
                       type="file"
-                      accept="image/png,image/jpeg,image/svg+xml"
+                      accept="image/png,image/jpeg,image/bmp,image/webp"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -415,7 +415,7 @@ export default function EnhancedChannelForm({
                     <input
                       id="watermark-upload"
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/bmp,image/webp"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -709,7 +709,7 @@ export default function EnhancedChannelForm({
                         <input
                           id="intro-upload"
                           type="file"
-                          accept="video/*"
+                          accept="video/mp4,video/webm"
                           className="hidden"
                           disabled={uploadingVideo}
                           onChange={(e) => {
@@ -811,7 +811,7 @@ export default function EnhancedChannelForm({
                       <input
                         id="outro-upload"
                         type="file"
-                        accept="video/*"
+                        accept="video/mp4,video/webm"
                         className="hidden"
                         disabled={uploadingVideo}
                         onChange={(e) => {
