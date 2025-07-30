@@ -449,15 +449,13 @@ export class TestingService {
       // Get test channel and template
       const channels = await storage.getChannels();
       const templates = await storage.getVideoTemplates();
-      const thumbnailTemplates = await storage.getThumbnailTemplates();
 
-      if (channels.length === 0 || templates.length === 0 || thumbnailTemplates.length === 0) {
+      if (channels.length === 0 || templates.length === 0) {
         throw new Error("No channels, templates, or thumbnail templates available for testing");
       }
 
       const channel = channels[0];
       const template = templates[0];
-      const thumbnailTemplate = thumbnailTemplates[0];
 
       // Create test video
       const video = await storage.createVideo({
@@ -472,7 +470,6 @@ export class TestingService {
         video.id,
         channel.id,
         template,
-        thumbnailTemplate,
         true // test mode
       );
 
@@ -512,7 +509,6 @@ export class TestingService {
       const validationResult = await validationService.validateVideoGenerationInput(
         999999, // Invalid channel ID
         999999, // Invalid template ID
-        999999, // Invalid thumbnail template ID
         true
       );
 

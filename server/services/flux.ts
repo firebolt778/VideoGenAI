@@ -10,6 +10,7 @@ export interface FluxImageOptions {
   scheduler?: string;
   seed?: number;
   image?: string;
+  model?: string;
 }
 
 export interface GeneratedImage {
@@ -35,7 +36,7 @@ export class FluxService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          version: "black-forest-labs/flux-schnell",
+          version: options.model || "black-forest-labs/flux-schnell",
           input: {
             prompt: options.prompt,
             width: options.width || 1024,
@@ -155,9 +156,12 @@ export class FluxService {
   }
 
   // Fallback to DALL-E 3 if Flux fails
-  async generateImageWithFallback(prompt: string, image?: string): Promise<GeneratedImage> {
+  async generateImageWithFallback(prompt: string, model?: string): Promise<GeneratedImage> {
     try {
-      return await this.generateImage({ prompt, image });
+      if (model === "dall-e-3") {
+        throw new Error("Using DALL-E 3 directly, skipping Flux generation.");
+      }
+      return await this.generateImage({ prompt, model });
     } catch (fluxError) {
       console.log('Flux generation failed, falling back to DALL-E 3:', (fluxError as Error).message);
 

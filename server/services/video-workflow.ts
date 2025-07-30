@@ -307,7 +307,7 @@ export class VideoWorkflowService {
     for (let i = 0; i < imagePrompts.length; i++) {
       const imagePrompt = imagePrompts[i];
       try {
-        const image = await fluxService.generateImageWithFallback(imagePrompt.description, images[i - 1]?.url);
+        const image = await fluxService.generateImageWithFallback(imagePrompt.description, template.imageModel || undefined);
         images.push({
           ...image,
           index: i + 1,

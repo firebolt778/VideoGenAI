@@ -65,6 +65,12 @@ const SHORTCODE_INFO = [
   { code: "{{IMAGES}}", description: "List of generated image descriptions" },
   { code: "{{CHANNEL_NAME}}", description: "Channel name" },
 ];
+const imageModels = [
+  { value: "black-forest-labs/flux-schnell", label: "Flux Schnell (Fast)" },
+  { value: "bytedance/seedream-3", label: "Seedream 3.0 (High Quality)" },
+  { value: "ideogram-ai/ideogram-v3-turbo", label: "Ideogram 3.0 (High Quality)" },
+  { value: "dalle-3", label: "DALL-E 3 (OpenAI)" },
+];
 
 export default function EnhancedStoryTemplateForm({
   template,
@@ -411,16 +417,11 @@ export default function EnhancedStoryTemplateForm({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="flux-schnell">
-                                Flux Schnell (Fast)
-                              </SelectItem>
-                              <SelectItem value="flux-pro">
-                                Flux Pro (High Quality)
-                              </SelectItem>
-                              <SelectItem value="dalle-3">DALL-E 3</SelectItem>
-                              <SelectItem value="midjourney">
-                                Midjourney
-                              </SelectItem>
+                              {imageModels.map((model, index) => (
+                                <SelectItem value={model.value} key={index}>
+                                  {model.label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -448,7 +449,7 @@ export default function EnhancedStoryTemplateForm({
                     )}
                   />
 
-                  <Separator />
+                  {/* <Separator />
 
                   <div className="space-y-4">
                     <div className="flex items-center space-x-2">
@@ -508,7 +509,7 @@ export default function EnhancedStoryTemplateForm({
                         )}
                       />
                     )}
-                  </div>
+                  </div> */}
                 </CardContent>
               </Card>
             </TabsContent>
