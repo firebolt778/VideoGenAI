@@ -28,19 +28,26 @@ export interface YouTubeScheduleSettings {
 }
 
 export class YouTubeService {
-  private youtube: any;
-  private oauth2Client: any;
+  private youtube;
+  private oauth2Client;
 
   constructor() {
-    const clientId = process.env.YOUTUBE_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID_ENV_VAR || "default_client_id";
-    const clientSecret = process.env.YOUTUBE_CLIENT_SECRET || process.env.YOUTUBE_CLIENT_SECRET_ENV_VAR || "default_client_secret";
-    const redirectUri = process.env.YOUTUBE_REDIRECT_URI || process.env.YOUTUBE_REDIRECT_URI_ENV_VAR || "http://localhost:5000/auth/youtube/callback";
+    const clientId = process.env.YOUTUBE_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID_ENV_VAR;
+    const clientSecret = process.env.YOUTUBE_CLIENT_SECRET || process.env.YOUTUBE_CLIENT_SECRET_ENV_VAR;
+    const redirectUri = process.env.YOUTUBE_REDIRECT_URI || process.env.YOUTUBE_REDIRECT_URI_ENV_VAR || "http://localhost:5000/callback";
+    const refreshToken = process.env.YOUTUBE_REFRESH_TOKEN;
 
     this.oauth2Client = new google.auth.OAuth2(
       clientId,
       clientSecret,
       redirectUri
     );
+
+    if (refreshToken) {
+      this.oauth2Client.setCredentials({
+        refresh_token: refreshToken
+      });
+    }
 
     this.youtube = google.youtube({
       version: 'v3',
@@ -56,6 +63,7 @@ export class YouTubeService {
 
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
+      prompt: 'consent', // Ensures refresh token is sent every time
       scope: scopes,
     });
   }
@@ -69,10 +77,27 @@ export class YouTubeService {
     }
   }
 
+  async refreshAccessToken() {
+    const tokenResponse = await this.oauth2Client.getAccessToken();
+    if (!tokenResponse.token) {
+      throw new Error("Failed to refresh access token.");
+    }
+    this.oauth2Client.setCredentials({
+      refresh_token: process.env.YOUTUBE_REFRESH_TOKEN,
+      access_token: tokenResponse.token,
+    });
+  }
+
   async uploadVideo(upload: YouTubeVideoUpload): Promise<string> {
     try {
       const fs = await import('fs');
-      
+
+      const filePath = upload.videoFilePath;
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`Video file not found: ${filePath}`);
+      }
+      const stream = fs.createReadStream(filePath);
+
       const requestParameters = {
         part: ['snippet', 'status'],
         requestBody: {
@@ -88,8 +113,9 @@ export class YouTubeService {
           },
         },
         media: {
-          body: fs.createReadStream(upload.videoFilePath),
+          body: stream,
         },
+        uploadType: 'resumable',
       };
 
       const response = await this.youtube.videos.insert(requestParameters);
@@ -97,10 +123,11 @@ export class YouTubeService {
 
       // Upload thumbnail if provided
       if (upload.thumbnailPath && videoId) {
+        console.log("Uploading thumbnail for video ID:", videoId);
         await this.uploadThumbnail(videoId, upload.thumbnailPath);
       }
 
-      return videoId;
+      return videoId || "No Video ID returned from upload";
     } catch (error) {
       throw new Error(`Failed to upload video to YouTube: ${(error as Error).message}`);
     }
@@ -108,12 +135,22 @@ export class YouTubeService {
 
   async uploadThumbnail(videoId: string, thumbnailPath: string): Promise<void> {
     try {
+      let path = thumbnailPath;
+      if (!path) {
+        throw new Error('Thumbnail path is required');
+      }
+      if (!thumbnailPath.startsWith('thumbnails/')) {
+        path = `uploads/images/${thumbnailPath}`;
+      }
       const fs = await import('fs');
+      if (!fs.existsSync(path)) {
+        throw new Error(`Thumbnail file not found: ${thumbnailPath}`);
+      }
       
       await this.youtube.thumbnails.set({
         videoId: videoId,
         media: {
-          body: fs.createReadStream(thumbnailPath),
+          body: fs.createReadStream(path),
         },
       });
     } catch (error) {
@@ -121,30 +158,30 @@ export class YouTubeService {
     }
   }
 
-  async getChannelInfo(channelId?: string): Promise<YouTubeChannel | null> {
-    try {
-      const response = await this.youtube.channels.list({
-        part: ['snippet', 'statistics'],
-        id: channelId || undefined,
-        mine: !channelId,
-      });
+  // async getChannelInfo(channelId?: string): Promise<YouTubeChannel | null> {
+  //   try {
+  //     const response = await this.youtube.channels.list({
+  //       part: ['snippet', 'statistics'],
+  //       id: channelId || undefined,
+  //       mine: !channelId,
+  //     });
 
-      const channel = response.data.items?.[0];
-      if (!channel) {
-        return null;
-      }
+  //     const channel = response.data.items?.[0];
+  //     if (!channel) {
+  //       return null;
+  //     }
 
-      return {
-        id: channel.id,
-        title: channel.snippet.title,
-        subscriberCount: channel.statistics.subscriberCount,
-        viewCount: channel.statistics.viewCount,
-        videoCount: channel.statistics.videoCount,
-      };
-    } catch (error) {
-      throw new Error(`Failed to get channel info: ${(error as Error).message}`);
-    }
-  }
+  //     return {
+  //       id: channel.id,
+  //       title: channel.snippet.title,
+  //       subscriberCount: channel.statistics.subscriberCount,
+  //       viewCount: channel.statistics.viewCount,
+  //       videoCount: channel.statistics.videoCount,
+  //     };
+  //   } catch (error) {
+  //     throw new Error(`Failed to get channel info: ${(error as Error).message}`);
+  //   }
+  // }
 
   async getVideoStats(videoId: string): Promise<any> {
     try {

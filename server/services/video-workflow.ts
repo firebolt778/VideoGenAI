@@ -564,7 +564,8 @@ export class VideoWorkflowService {
         channelName: channel.name,
         channelDescription: channel.description || ""
       };
-      return ShortcodeProcessor.process(channel.videoDescriptionPrompt, context);
+      const prompt = ShortcodeProcessor.process(channel.videoDescriptionPrompt, context);
+      return await openaiService.generateVideoDescription(title, script, {}, prompt);
     }
 
     return await openaiService.generateVideoDescription(title, script, {
@@ -580,6 +581,7 @@ export class VideoWorkflowService {
     description: string,
     channel: Channel
   ): Promise<string> {
+    await youtubeService.refreshAccessToken();
     const videoId = await youtubeService.uploadVideo({
       title,
       description,

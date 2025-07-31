@@ -246,8 +246,8 @@ Respond with JSON in this exact format:
     }
   }
 
-  async generateVideoDescription(title: string, script: string, channelInfo?: any, options?: PromptModel): Promise<string> {
-    const prompt = `
+  async generateVideoDescription(title: string, script: string, channelInfo?: any, customPrompt?: string, options?: PromptModel): Promise<string> {
+    const prompt = customPrompt || `
 Create an engaging YouTube video description for this video:
 
 Title: ${title}
