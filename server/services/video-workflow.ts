@@ -239,7 +239,7 @@ export class VideoWorkflowService {
     }
 
     const prompt = ShortcodeProcessor.process(template.storyOutlinePrompt, context);
-    const response = await openaiService.generateStoryOutline(context.selectedIdea || "", template.imageCount || 5, prompt);
+    const response = await openaiService.generateStoryOutline(context.selectedIdea || "", template.imageCount || 5, prompt, template.outlinePromptModel || undefined);
 
     return {
       raw: JSON.stringify(response),
@@ -269,6 +269,7 @@ export class VideoWorkflowService {
         previousScript,
         template.videoLength || undefined,
         prompt,
+        template.scriptPromptModel || undefined,
       );
       fullScript += chapterScript + "\n\n";
       previousScript += chapterScript + "\n\n";
@@ -286,7 +287,7 @@ export class VideoWorkflowService {
     const prompt = ShortcodeProcessor.process(hookTemplate.prompt, context);
 
     // Use OpenAI to generate hook
-    const response = await openaiService.generateFullScript(prompt, context.outline || "");
+    const response = await openaiService.generateFullScript(prompt, context.outline || "", hookTemplate.promptModel ?? undefined);
     return response;
   }
 
@@ -300,7 +301,8 @@ export class VideoWorkflowService {
       context.script!,
       context.imageCount || 8,
       prompt,
-      { mainCharacter: context.mainCharacter, environment: context.environment }
+      { mainCharacter: context.mainCharacter, environment: context.environment },
+      template.imgPromptModel || undefined,
     );
 
     const images = [];

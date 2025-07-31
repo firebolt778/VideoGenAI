@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { imageModels } from "@/lib/imgModels";
 import {
+  defaultPromptModel,
   insertVideoTemplateSchema,
   VideoTemplate,
   type InsertVideoTemplate,
@@ -52,6 +53,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ElevenLabsVoice } from "server/services/elevenlabs";
+import PromptModelSelector from "../prompt-model";
 
 interface EnhancedStoryTemplateFormProps {
   template?: VideoTemplate | null;
@@ -88,8 +90,12 @@ export default function EnhancedStoryTemplateForm({
       ideasList: template?.ideasList || "",
       ideasDelimiter: template?.ideasDelimiter || "---",
       storyOutlinePrompt: template?.storyOutlinePrompt || "",
+      outlinePromptModel: template?.outlinePromptModel || defaultPromptModel,
+      chapterStoryPrompt: template?.chapterStoryPrompt || "",
+      scriptPromptModel: template?.scriptPromptModel || defaultPromptModel,
       videoLength: template?.videoLength || 60,
       imagePrompt: template?.imagePrompt || "",
+      imgPromptModel: template?.imgPromptModel || defaultPromptModel,
       imageCount: template?.imageCount || 8,
       imageModel: template?.imageModel || "flux-schnell",
       imageFallbackModel: template?.imageFallbackModel || "dalle-3",
@@ -319,6 +325,47 @@ export default function EnhancedStoryTemplateForm({
                       </FormItem>
                     )}
                   />
+                  <PromptModelSelector
+                    form={form}
+                    name="outlinePromptModel"
+                    className="mt-4"
+                    title="Outline Generation Model"
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Full Script Generation *</CardTitle>
+                  <CardDescription>
+                    Convert outline into complete narration script
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <FormField
+                    control={form.control}
+                    name="chapterStoryPrompt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Story Prompt</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Turn this outline into a complete narration script: {{OUTLINE}}&#10;&#10;Write engaging, conversational narration suitable for a 5-10 minute video. Include dramatic pauses and emphasis. Enclose the final script between --- markers."
+                            className="min-h-[120px]"
+                            {...field}
+                            value={field.value ?? undefined}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <PromptModelSelector
+                    form={form}
+                    name="scriptPromptModel"
+                    className="mt-4"
+                    title="Full Script Generation Model"
+                  />
                 </CardContent>
               </Card>
 
@@ -442,6 +489,13 @@ export default function EnhancedStoryTemplateForm({
                         <FormMessage />
                       </FormItem>
                     )}
+                  />
+
+                  <PromptModelSelector
+                    form={form}
+                    name="imgPromptModel"
+                    className="mt-4"
+                    title="Image Prompt Generation Model"
                   />
 
                   {/* <Separator />

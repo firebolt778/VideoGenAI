@@ -3,6 +3,22 @@ import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export type PromptModel = {
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  topP: number;
+  frequencyPenalty: number;
+}
+
+export const defaultPromptModel: PromptModel = {
+  model: "gpt-4o",
+  temperature: 0.7,
+  maxTokens: 8192,
+  topP: 0.9,
+  frequencyPenalty: 0.0,
+}
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -61,9 +77,12 @@ export const videoTemplates = pgTable("video_templates", {
   ideasList: text("ideas_list"),
   ideasDelimiter: text("ideas_delimiter").default("---"),
   storyOutlinePrompt: text("story_outline_prompt"),
+  outlinePromptModel: jsonb("outline_prompt_model").$type<PromptModel>().default(defaultPromptModel),
   chapterStoryPrompt: text("chapter_story_prompt"),
+  scriptPromptModel: jsonb("script_prompt_model").$type<PromptModel>().default(defaultPromptModel),
   videoLength: integer("video_length"),
   imagePrompt: text("image_prompt"),
+  imgPromptModel: jsonb("img_prompt_model").$type<PromptModel>().default(defaultPromptModel),
   imageCount: integer("image_count").default(8),
   imageModel: text("image_model").default("flux-schnell"),
   imageFallbackModel: text("image_fallback_model").default("dalle-3"),
@@ -110,6 +129,7 @@ export const hookTemplates = pgTable("hook_templates", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   prompt: text("prompt").notNull(),
+  promptModel: jsonb("prompt_model").$type<PromptModel>().default(defaultPromptModel),
   editSpeed: text("edit_speed").default("medium"), // slow, medium, fast
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

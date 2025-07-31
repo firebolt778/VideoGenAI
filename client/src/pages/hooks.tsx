@@ -6,8 +6,10 @@ import {
   insertHookTemplateSchema,
   type InsertHookTemplate,
   type HookTemplate,
+  defaultPromptModel,
 } from "@shared/schema";
 import Header from "@/components/layout/header";
+import PromptModelSelector from "@/components/prompt-model";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +71,7 @@ export default function Hooks() {
       name: "",
       prompt: "",
       editSpeed: "medium",
+      promptModel: defaultPromptModel,
     },
   });
 
@@ -320,7 +323,7 @@ export default function Hooks() {
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl max-h-[90%] overflow-auto">
           <DialogHeader>
             <DialogTitle>
               {editingTemplate ? "Edit Hook Template" : "Create Hook Template"}
@@ -366,6 +369,12 @@ export default function Hooks() {
                     <FormMessage />
                   </FormItem>
                 )}
+              />
+
+              <PromptModelSelector
+                form={form}
+                name="promptModel"
+                title="Hook Generation Model"
               />
 
               <FormField
