@@ -372,6 +372,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/thumbnail-templates/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertThumbnailTemplateSchema.partial().parse(req.body);
+      const template = await storage.updateThumbnailTemplate(id, validatedData);
+
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+
+      res.json(template);
+    } catch (error) {
+      res.status(400).json({ message: (error as Error).message || "Failed to update thumbnail template" });
+    }
+  });
+
+  app.delete("/api/thumbnail-templates/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteThumbnailTemplate(id);
+      if (deleted) {
+        res.status(204).send();
+      } else {
+        res.status(404).json({ message: "Template not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: (error as Error).message || "Failed to delete thumbnail template" });
+    }
+  });
+
   // Hook template routes
   app.get("/api/hook-templates", async (req, res) => {
     try {

@@ -44,9 +44,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit, Trash2, Plus, TestTube } from "lucide-react";
+import { Edit, Trash2, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { imageModels } from "@/lib/imgModels";
 
 export default function Thumbnails() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -275,7 +276,7 @@ export default function Thumbnails() {
                           {getTypeBadge(template.type || "ai-generated")}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {template.model || "gpt-4o"}
+                          {template.type === "ai-generated" && (template.model || "gpt-4o")}
                         </TableCell>
                         <TableCell className="text-sm">
                           {template.fallbackStrategy || "first-image"}
@@ -400,13 +401,13 @@ export default function Thumbnails() {
                     )}
                   />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> */}
                     <FormField
                       control={form.control}
                       name="model"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Primary Model</FormLabel>
+                          <FormLabel>Image Model</FormLabel>
                           <Select
                             onValueChange={field.onChange}
                             defaultValue={field.value ?? undefined}
@@ -417,12 +418,11 @@ export default function Thumbnails() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                              <SelectItem value="flux-pro">Flux Pro</SelectItem>
-                              <SelectItem value="flux-schnell">
-                                Flux Schnell
-                              </SelectItem>
-                              <SelectItem value="dalle-3">DALL-E 3</SelectItem>
+                              {imageModels.map((model, index) => (
+                                <SelectItem value={model.value} key={index}>
+                                  {model.label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -430,7 +430,7 @@ export default function Thumbnails() {
                       )}
                     />
 
-                    <FormField
+                    {/* <FormField
                       control={form.control}
                       name="fallbackModel"
                       render={({ field }) => (
@@ -458,7 +458,7 @@ export default function Thumbnails() {
                         </FormItem>
                       )}
                     />
-                  </div>
+                  </div> */}
                 </>
               )}
 

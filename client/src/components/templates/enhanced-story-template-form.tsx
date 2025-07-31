@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { imageModels } from "@/lib/imgModels";
 import {
   insertVideoTemplateSchema,
   VideoTemplate,
@@ -64,12 +65,6 @@ const SHORTCODE_INFO = [
   { code: "{{TITLE}}", description: "Video title" },
   { code: "{{IMAGES}}", description: "List of generated image descriptions" },
   { code: "{{CHANNEL_NAME}}", description: "Channel name" },
-];
-const imageModels = [
-  { value: "black-forest-labs/flux-schnell", label: "Flux Schnell (Fast)" },
-  { value: "bytedance/seedream-3", label: "Seedream 3.0 (High Quality)" },
-  { value: "ideogram-ai/ideogram-v3-turbo", label: "Ideogram 3.0 (High Quality)" },
-  { value: "dalle-3", label: "DALL-E 3 (OpenAI)" },
 ];
 
 export default function EnhancedStoryTemplateForm({
