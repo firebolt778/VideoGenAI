@@ -24,21 +24,20 @@ export interface ImagePrompt {
 }
 
 export interface ImageAssignment {
-  imageIndex: number;
-  scriptSegment: string;
-  description: string;
-  filename: string;
+  chapter: string;
+  images: Array<{
+    filename: string;
+    scriptSegment: string;
+  }>;
 }
 
 export class OpenAIService {
-  async generateStoryOutline(idea: string, imageCount: number, customPrompt?: string, options?: PromptModel): Promise<StoryOutline> {
+  async generateStoryOutline(idea: string, customPrompt?: string, options?: PromptModel): Promise<StoryOutline> {
     let prompt = customPrompt || `
 Create a compelling story outline for a YouTube video based on this idea: "${idea}"
-
-The story should be engaging, and mysterious.
-The story should be suitable for 60-70 minutes video: 7500-9000 word.`
+Include 5 chapters with descriptive names.
+The story should be engaging, and mysterious.`
     prompt += `
-Include ${imageCount} chapters with descriptive names.
 Respond with JSON in this exact format:
 {
   "title": "Video title",
@@ -78,7 +77,59 @@ Respond with JSON in this exact format:
     }
   }
 
-  async generateFullScript(customPrompt: string, outline: string, options?: PromptModel): Promise<string> {
+  async generateFullScript(outline: StoryOutline, customPrompt?: string, options?: PromptModel): Promise<string> {
+    let prompt = customPrompt || `
+Based on this story outline, write a complete, engaging script for a YouTube video:
+"""
+${JSON.stringify(outline, null, 2)}
+"""
+
+Write a full narrative script that:
+- Is engaging and keeps viewers hooked
+- Has natural pacing and flow
+- Is approximately 2000-3000 words
+- Uses vivid, descriptive language
+- Maintains suspense throughout
+`;
+    prompt += `
+Enclose the script content between --- markers like this:
+---
+[Your script here]
+---`;
+
+    try {
+      const response = await openai.chat.completions.create({
+        model: options?.model || "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are a professional scriptwriter specializing in engaging YouTube content."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: options?.temperature ?? 0.7,
+        frequency_penalty: options?.frequencyPenalty ?? 0,
+        max_completion_tokens: options?.maxTokens || 4000,
+        top_p: options?.topP || 1.0
+      });
+
+      const content = response.choices[0].message.content || "";
+      const scriptMatch = content.match(/---\s*([\s\S]*?)\s*---/);
+      
+      if (scriptMatch) {
+        return scriptMatch[1].trim();
+      }
+      
+      return content;
+    } catch (error) {
+      throw new Error(`Failed to generate full script: ${(error as Error).message}`);
+    }
+  }
+
+  async generateHook(customPrompt: string, outline: string, options?: PromptModel): Promise<string> {
     const prompt = customPrompt || `
 Write a hook for a story video outline listed below.
 The hook should:
@@ -126,65 +177,74 @@ ${outline}
     }
   }
 
-  async generateScriptForChapter(outline: StoryOutline, chapter: { name: string, description: string }, previousScript?: string, videoLength?: number, customPrompt?: string, options?: PromptModel): Promise<string> {
-    const len = (videoLength || 60) / outline.chapters.length;
+  async assignImagesToScript(outline: string, script: string, images: any[], customPrompt?: string, options?: PromptModel): Promise<ImageAssignment[]> {
     let prompt = customPrompt || `
-Write a spoken-word script for a YouTube video chapter. The tone should be natural, engaging, and suited for voiceover narration—imagine someone speaking directly to the audience.
+Match these image descriptions to specific segments of the script for optimal visual storytelling:
 
-Here’s the context:
-Title: ${outline.title}
-Summary: ${outline.summary}
+Outline:
+"""
+${outline}
+"""
 
-Guidelines:
-- Use conversational language, as if a person is explaining something to a friend.
-- Vary sentence length and pacing to sound more natural when read aloud.
-- Use rhetorical questions, pauses, or brief asides for a dynamic spoken effect.
-- Make transitions smooth and logical to maintain flow between ideas.
-- Avoid overly complex or literary phrasing—keep it simple and human.
-- Do **not** include scene directions or camera cues—just spoken narration.
-- End with a sentence that leads naturally into the next chapter (if applicable).
+Full Script:
+"""
+${script}
+"""
+
+Available images:
+${JSON.stringify(images, undefined, 2)}
 `;
     prompt += `
-Here’s the chapter:
-Chapter: ${chapter.name} - ${chapter.description}
-${previousScript ? `Previous script:\n${previousScript}\n` : ""}
+Requirements:
+- Include all images in the response unless they don't match any script segment.
+- Include all chapters in the response.
+- Each chapter must include at least 1 image.
+- The result scriptSegments must include all of the original script.
 
-Target word count: ${len * 135}-${len * 150} words.
-
-Enclose the script content between --- markers like this:
----
-[Your script here]
----`;
-
+Respond with JSON in this exact format:
+{
+  "assignments": [
+    {
+      "chapter": "Chapter 1. Exact title from the outline",
+      "images": [
+        {
+          "filename": "Exact filename from the images list",
+          "scriptSegment": "Texts from script this image should accompany",
+        },
+        {
+          "filename": "Exact filename from the images list",
+          "scriptSegment": "Texts from script this image should accompany",
+        },
+        ...
+      ]
+    }
+  ]
+}`;
+console.log(prompt);
     try {
       const response = await openai.chat.completions.create({
         model: options?.model || "gpt-4o",
         messages: [
           {
             role: "system",
-            content: "You are a professional scriptwriter specializing in engaging YouTube content."
+            content: "You are an expert video editor who understands visual storytelling and pacing."
           },
           {
             role: "user",
             content: prompt
           }
         ],
+        response_format: { type: "json_object" },
         temperature: options?.temperature ?? 0.7,
         frequency_penalty: options?.frequencyPenalty ?? 0,
         max_completion_tokens: options?.maxTokens || 4000,
         top_p: options?.topP || 1.0
       });
-  
-      const content = response.choices[0].message.content || "";
-      const scriptMatch = content.match(/---\s*([\s\S]*?)\s*---/);
-  
-      if (scriptMatch) {
-        return scriptMatch[1].trim();
-      }
-  
-      return content;
+
+      const result = JSON.parse(response.choices[0].message.content || "{}");
+      return result.assignments || [];
     } catch (error) {
-      throw new Error(`Failed to generate script for chapter: ${(error as Error).message}`);
+      throw new Error(`Failed to assign images to script: ${(error as Error).message}`);
     }
   }
 

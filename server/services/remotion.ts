@@ -10,16 +10,17 @@ export interface RemotionVideoConfig {
     color: string;
     bgColor: string;
   };
-  script: string;
   audioSegments: Array<{
     filename: string;
     text: string;
     duration: number;
   }>;
-  images: Array<{
-    filename: string;
-    description: string;
-    scriptSegment: string;
+  imageAssignments: Array<{
+    chapter: string;
+    images: Array<{
+      filename: string;
+      scriptSegment: string;
+    }>;
   }>;
   bgAudio?: string;
   hookAudio?: {
@@ -102,9 +103,10 @@ export class RemotionService {
       }
 
       const assetBaseUrl = process.env.ASSET_BASE_URL || "http://127.0.0.1:5000/";
-      for (let i = 0; i < config.images.length; i++) {
-        config.images[i].filename =
-          `${assetBaseUrl}uploads/images/${config.images[i].filename}`;
+      for (let i = 0; i < config.imageAssignments.length; i++) {
+        for (let j = 0; j < config.imageAssignments[i].images.length; j++) {
+          config.imageAssignments[i].images[j].filename = `${assetBaseUrl}uploads/images/${config.imageAssignments[i].images[j].filename}`;
+        }
       }
       for (let i = 0; i < config.audioSegments.length; i++) {
         config.audioSegments[i].filename =
@@ -143,7 +145,7 @@ export class RemotionService {
       }
 
       let totalDuration = config.audioSegments.reduce((sum, segment) => sum + segment.duration, 0) / 1000;
-      totalDuration += 2.5 * config.audioSegments.length; // Add 2.5 seconds per segment for transitions
+      totalDuration += 2.5 * (config.chapterMarkers || []).length; // Add 2.5 seconds per chapter marker
       if (config.intro) {
         totalDuration += config.intro.duration || 0;
       }
@@ -224,10 +226,12 @@ interface StoryVideoProps {
     text: string;
     duration: number;
   }>;
-  images: Array<{
-    filename: string;
-    description: string;
-    scriptSegment: string;
+  imageAssignments: Array<{
+    chapter: string;
+    images: Array<{
+      filename: string;
+      scriptSegment: string;
+    }>;
   }>;
   bgAudio?: string;
   hookAudio?: {
@@ -285,7 +289,7 @@ const FILM_GRAIN_SVG = \`data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/s
 export const StoryVideo: React.FC<StoryVideoProps> = ({
   title,
   audioSegments,
-  images,
+  imageAssignments,
   bgAudio,
   hookAudio,
   watermark,
@@ -350,19 +354,19 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     };
   }, [audioSegments, chapterMarkers, hookAudio, intro, outro, fps]);
 
+  const images = useMemo(() => {
+    return imageAssignments.flatMap(assignment => assignment.images);
+  }, [imageAssignments]);
+
   // Memoize segment timing calculations
   const segmentTimings = useMemo(() => {
     return audioSegments.map((segment, index) => {
-      let segmentStartTime = 0;
-
-      for (let i = 0; i < index; i++) {
-        segmentStartTime += audioSegments[i].duration;
-        if (chapterMarkers[i]) {
-          segmentStartTime += timingData.CHAPTER_MARKER_DURATION * 1000;
+      const audioDuration = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
+      let segmentStartTime = audioDuration;
+      for (let i = 0; i < chapterMarkers.length; i++) {
+        if (chapterMarkers[i].time > audioDuration) {
+          break;
         }
-      }
-
-      if (chapterMarkers[index]) {
         segmentStartTime += timingData.CHAPTER_MARKER_DURATION * 1000;
       }
 
@@ -733,14 +737,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     const marker = chapterMarkers[markerIndex];
     if (!marker) return null;
 
-    let markerStartTime = 0;
-
-    for (let i = 0; i < markerIndex; i++) {
-      if (chapterMarkers[i]) {
-        markerStartTime += timingData.CHAPTER_MARKER_DURATION * 1000;
-      }
-      markerStartTime += audioSegments[i]?.duration || 0;
-    }
+    const markerStartTime = marker.time + timingData.CHAPTER_MARKER_DURATION * 1000 * markerIndex;
 
     const markerStartFrame = timingData.mainContentStartFrame + Math.round((markerStartTime / 1000) * fps);
     const markerDuration = Math.round(timingData.CHAPTER_MARKER_DURATION * fps);

@@ -4,7 +4,13 @@ export interface ShortcodeContext {
   outline?: string;
   script?: string;
   title?: string;
-  images?: string[];
+  images?: {
+    index: number;
+    description: string;
+    url: string;
+    filename: string;
+    prompt: string;
+  }[];
   channelName?: string;
   channelDescription?: string;
   imageCount?: number;
@@ -25,7 +31,7 @@ export class ShortcodeProcessor {
       '{{SCRIPT}}': context.script || '',
       '{{TITLE}}': context.title || '',
       '{{SUMMARY}}': outline.summary || '',
-      '{{IMAGES}}': context.images?.join('\n') || '',
+      '{{IMAGES}}': JSON.stringify(context.images || []),
       '{{CHANNEL_NAME}}': context.channelName || '',
       '{{CHANNEL_DESCRIPTION}}': context.channelDescription || '',
       '{{imageCount}}': context.imageCount?.toString() || '8',

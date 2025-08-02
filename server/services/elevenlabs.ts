@@ -140,7 +140,7 @@ export class ElevenLabsService {
     return segments;
   }
 
-  private estimateAudioDuration(text: string): number {
+  estimateAudioDuration(text: string): number {
     // Rough estimation: ~150 words per minute, ~5 characters per word
     const wordsPerMinute = 150;
     const charactersPerWord = 5;

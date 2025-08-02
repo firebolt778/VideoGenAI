@@ -23,15 +23,6 @@ export interface VideoGenerationProgress {
   error?: string;
 }
 
-interface ChapterSegment {
-  scriptSegment: string;
-  chapterIndex: number;
-  chapter: {
-    name: string;
-    description: string;
-  };
-}
-
 export class VideoWorkflowService {
   private progressCallbacks: Map<number, (progress: VideoGenerationProgress) => void> = new Map();
 
@@ -93,20 +84,17 @@ export class VideoWorkflowService {
       );
       await fs.writeFile(path.join(compositionsDir, 'outline.txt'), JSON.stringify(structuredClone(outline), undefined, 2));
       context.outline = outline.raw;
-      if (outline.chapters.length !== template.imageCount) {
-        throw new Error(`OpenAI API Error: The number of chapters is invalid.`);
-      }
 
       const title = outline.title || `${channel.name} Story`;
+      context.title = title;
       await storage.updateVideo(videoId, { title });
       await this.logProgress(videoId, "outline", 15, `Generated outline: ${title}`);
 
       // Step 3: Generate full script
-      const { fullScript: script, chapterSegments } = await this.generateScriptAndAssignImages(template, context);
-      await fs.writeFile(path.join(compositionsDir, 'fullScript.txt'), script);
-      context.script = script;
-      context.title = title;
-      await this.logProgress(videoId, "script", 45, "Generated full script");
+      const fullScript = await this.generateFullScript(template, context);
+      context.script = fullScript;
+      await fs.writeFile(path.join(compositionsDir, 'fullScript.txt'), fullScript);
+      await this.logProgress(videoId, "script", 20, "Generated full script");
 
       // Step 4: Generate hook (if enabled)
       let hookAudio: AudioSegment | undefined = undefined;
@@ -114,45 +102,44 @@ export class VideoWorkflowService {
         const hook = await this.generateHook(hookTemplate, context);
         await fs.writeFile(path.join(compositionsDir, 'hook.txt'), hook);
         hookAudio = await this.generateHookAudio(hookTemplate, hook, voiceId);
-        await this.logProgress(videoId, "hook", 50, "Generated video hook");
+        await this.logProgress(videoId, "hook", 30, "Generated video hook");
       }
 
       // Step 5: Generate images
       const images = await this.generateImages(template, context);
       await fs.writeFile(path.join(compositionsDir, 'images.txt'), JSON.stringify(structuredClone(images), undefined, 2));
-      context.images = images.map(img => img.description);
-      await this.logProgress(videoId, "images", 60, `Generated ${images.length} images`);
+      context.images = images;
+      await this.logProgress(videoId, "images", 45, `Generated ${images.length} images`);
 
       // Step 6: Assign images to script segments
-      const imageAssignments = chapterSegments.map((segment, i) => ({
-        ...segment,
-        image: images[i] || images[images.length - 1]
-      }));
+      const imageAssignments = await this.assignImages(template, context);
+      await fs.writeFile(path.join(compositionsDir, 'imageAssignments.txt'), JSON.stringify(structuredClone(imageAssignments), undefined, 2));
+      await this.logProgress(videoId, "image_assignment", 50, "Assigned images to script segments");
 
       // Step 7: Generate audio segments
       const { audioSegments, bgAudio } = await this.generateAudio(template, imageAssignments, voiceId);
       await this.logProgress(videoId, "audio", 80, `Generated ${audioSegments.length} audio segments`);
 
       // Step 8: Render video with Remotion
-      const videoConfig = this.buildVideoConfig(title, script, audioSegments, images, chapterSegments, template, channel, bgAudio, hookAudio);
+      const videoConfig = this.buildVideoConfig(title, audioSegments, imageAssignments, template, channel, bgAudio, hookAudio);
       const videoPath = await remotionService.renderVideo(videoConfig, `output/video_${videoId}.mp4`);
       await this.logProgress(videoId, "rendering", 85, "Video rendering completed");
 
       // Step 9: Generate thumbnail
-      const thumbnailPath = await this.generateThumbnail(videoId, title, script, channel, images, thumbnailTemplate);
+      const thumbnailPath = await this.generateThumbnail(videoId, title, fullScript, channel, images, thumbnailTemplate);
       await this.logProgress(videoId, "thumbnail", 90, "Generated thumbnail");
 
       // Step 10: Upload to YouTube (if not test mode)
       let youtubeId = "";
       if (!testMode) {
-        const description = await this.generateVideoDescription(title, script, channel);
+        const description = await this.generateVideoDescription(title, fullScript, channel);
         youtubeId = await this.uploadToYouTube(videoPath, thumbnailPath, title, description, channel);
         await this.logProgress(videoId, "upload", 95, "Uploaded to YouTube");
       }
 
       // Step 11: Update video record
       await storage.updateVideo(videoId, {
-        script,
+        script: fullScript,
         videoUrl: videoPath,
         thumbnailUrl: thumbnailPath,
         youtubeId,
@@ -239,7 +226,7 @@ export class VideoWorkflowService {
     }
 
     const prompt = ShortcodeProcessor.process(template.storyOutlinePrompt, context);
-    const response = await openaiService.generateStoryOutline(context.selectedIdea || "", template.imageCount || 5, prompt, template.outlinePromptModel || undefined);
+    const response = await openaiService.generateStoryOutline(context.selectedIdea || "", prompt, template.outlinePromptModel || undefined);
 
     return {
       raw: JSON.stringify(response),
@@ -251,43 +238,22 @@ export class VideoWorkflowService {
     };
   }
 
-  private async generateScriptAndAssignImages(
-    template: VideoTemplate,
-    context: ShortcodeContext,
-  ): Promise<{ fullScript: string, chapterSegments: ChapterSegment[] }> {
+  private async generateFullScript(template: VideoTemplate, context: ShortcodeContext): Promise<string> {
     const outline = JSON.parse(context.outline || "{}");
-    let fullScript = "";
-    let previousScript = "";
-    const chapterSegments: ChapterSegment[] = [];
-    const prompt = ShortcodeProcessor.process(template.chapterStoryPrompt || "", context);
+    const prompt = ShortcodeProcessor.process(template.fullScriptPrompt || "", context);
+    return await openaiService.generateFullScript(outline, prompt, template.scriptPromptModel || undefined);
+  }
 
-    for (let i = 0; i < outline.chapters.length; i++) {
-      const chapter = outline.chapters[i];
-      const chapterScript = await openaiService.generateScriptForChapter(
-        outline,
-        chapter,
-        previousScript,
-        template.videoLength || undefined,
-        prompt,
-        template.scriptPromptModel || undefined,
-      );
-      fullScript += chapterScript + "\n\n";
-      previousScript += chapterScript + "\n\n";
-      chapterSegments.push({
-        scriptSegment: chapterScript,
-        chapterIndex: i,
-        chapter
-      });
-    }
-
-    return { fullScript: fullScript.trim(), chapterSegments };
+  private async assignImages(template: VideoTemplate, context: ShortcodeContext) {
+    const prompt = ShortcodeProcessor.process(template.imgAssignmentPrompt || "", context);
+    return await openaiService.assignImagesToScript(context.outline || "", context.script || "", context.images || [], prompt, template.imgAssignmentModel || undefined);
   }
 
   private async generateHook(hookTemplate: HookTemplate, context: ShortcodeContext): Promise<string> {
     const prompt = ShortcodeProcessor.process(hookTemplate.prompt, context);
 
     // Use OpenAI to generate hook
-    const response = await openaiService.generateFullScript(prompt, context.outline || "", hookTemplate.promptModel ?? undefined);
+    const response = await openaiService.generateHook(prompt, context.outline || "", hookTemplate.promptModel ?? undefined);
     return response;
   }
 
@@ -332,23 +298,25 @@ export class VideoWorkflowService {
     }> = [];
 
     for (let i = 0; i < imageAssignments.length; i++) {
-      const assignment = imageAssignments[i];
-
-      try {
-        const segment = await elevenLabsService.generateAudio(
-          assignment.scriptSegment,
-          voiceId,
-          `audio_segment_${i + 1}.mp3`
-        );
-        audioSegments.push(segment);
-      } catch (error) {
-        console.error(`Failed to generate audio for segment ${i + 1}:`, error);
-        // Create a placeholder segment
-        audioSegments.push({
-          text: assignment.scriptSegment,
-          filename: `placeholder_${i + 1}.mp3`,
-          duration: assignment.scriptSegment.length * 0.1 // Rough estimate
-        });
+      const chapter = imageAssignments[i];
+      for (let j = 0; j < chapter.images.length; j++) {
+        const image = chapter.images[j];
+        try {
+          const segment = await elevenLabsService.generateAudio(
+            image.scriptSegment,
+            voiceId,
+            `audio_segment_${i + 1}_${j + 1}.mp3`
+          );
+          audioSegments.push(segment);
+        } catch (error) {
+          console.error(`Failed to generate audio for segment ${i + 1}-${j + 1}:`, error);
+          // Create a placeholder segment
+          audioSegments.push({
+            text: image.scriptSegment,
+            filename: `placeholder_${i + 1}_${j + 1}.mp3`,
+            duration: elevenLabsService.estimateAudioDuration(image.scriptSegment)
+          });
+        }
       }
     }
 
@@ -399,10 +367,8 @@ export class VideoWorkflowService {
 
   private buildVideoConfig(
     title: string,
-    script: string,
     audioSegments: any[],
-    images: any[],
-    chapterSegments: ChapterSegment[],
+    imageAssignments: any[],
     template: VideoTemplate,
     channel: Channel,
     bgAudio?: string,
@@ -415,13 +381,8 @@ export class VideoWorkflowService {
         color: channel.titleColor || "#ffffff",
         font: channel.titleFont || "Arial",
       },
-      script,
       audioSegments,
-      images: images.map(img => ({
-        filename: img.filename,
-        description: img.description,
-        scriptSegment: img.prompt || ""
-      })),
+      imageAssignments,
       bgAudio,
       hookAudio: hookAudio ? {
         filename: hookAudio.filename || "",
@@ -460,10 +421,11 @@ export class VideoWorkflowService {
     };
     if (channel.chapterIndicators) {
       const chapterMarkers: { text: string; time: number }[] = [];
-      for (let i = 0; i < chapterSegments.length; i++) {
-        const audio = audioSegments.slice(0, i);
+      for (let i = 0; i < imageAssignments.length; i++) {
+        const chapters = imageAssignments.slice(0, i).reduce((sum, chapter) => sum + chapter.images.length, 0);
+        const audio = audioSegments.slice(0, chapters);
         chapterMarkers.push({
-          text: chapterSegments[i].chapter.name,
+          text: imageAssignments[i].chapter,
           time: audio.reduce((sum, aud) => sum + (aud.duration || 0), 0),
         });
       }

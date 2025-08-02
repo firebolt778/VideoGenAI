@@ -308,7 +308,7 @@ export class TestingService {
       
       // Test with a simple prompt
       const testPrompt = "Generate a simple story outline for a 5-minute video about technology.";
-      const result = await openaiService.generateStoryOutline("Test idea", 5, testPrompt);
+      const result = await openaiService.generateStoryOutline("Test idea", testPrompt);
       
       if (!result.title || !result.chapters || result.chapters.length === 0) {
         throw new Error("OpenAI service returned invalid response format");
