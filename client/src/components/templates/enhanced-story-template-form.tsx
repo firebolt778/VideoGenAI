@@ -91,7 +91,9 @@ export default function EnhancedStoryTemplateForm({
       ideasDelimiter: template?.ideasDelimiter || "---",
       storyOutlinePrompt: template?.storyOutlinePrompt || "",
       outlinePromptModel: template?.outlinePromptModel || defaultPromptModel,
-      chapterStoryPrompt: template?.chapterStoryPrompt || "",
+      fullScriptPrompt: template?.fullScriptPrompt || "",
+      imgAssignmentPrompt: template?.imgAssignmentPrompt || "",
+      imgAssignmentModel: template?.imgAssignmentModel || defaultPromptModel,
       scriptPromptModel: template?.scriptPromptModel || defaultPromptModel,
       videoLength: template?.videoLength || 60,
       imagePrompt: template?.imagePrompt || "",
@@ -315,7 +317,7 @@ export default function EnhancedStoryTemplateForm({
                         <FormLabel>Story Outline Prompt</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Create a story outline for: {{IDEAS}}"
+                            placeholder={"Give me a story outline that follows this concept:\n\"\"\"\n{{IDEAS}}\"\"\"\n\nInclude 5 chapters with descriptive names.\n\nThe story should be engaging, and mysterious.\n\nTry to make it shocking or compelling. Consider real stories, novels or movies that have a similar premise, and use a similar twist or reveal. Don't confuse things by having multiple things happen. Add a little foreshadowing too, if appropriate. Make it clear in your outline, the important plot points, so that there is no confusion or contradictions in the story\n\nIt needs specifics, a title, characters, plot etc. Break the plot outline down into chapters, listing multiple things that happen in each chapter. Be original and creative. Make it really shocking. This is a horror. You will be writing this ultimately, so you need to come up with a good storyline. Your title MUST be unique, and fit the story, rather than create a story to fit the title.\n"}
                             className="min-h-[120px]"
                             {...field}
                             value={field.value ?? undefined}
@@ -344,13 +346,13 @@ export default function EnhancedStoryTemplateForm({
                 <CardContent>
                   <FormField
                     control={form.control}
-                    name="chapterStoryPrompt"
+                    name="fullScriptPrompt"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Full Story Prompt</FormLabel>
                         <FormControl>
                           <Textarea 
-                            placeholder="Turn this outline into a complete narration script: {{OUTLINE}}&#10;&#10;Write engaging, conversational narration suitable for a 5-10 minute video. Include dramatic pauses and emphasis. Enclose the final script between --- markers."
+                            placeholder={"Based on this story outline, write a complete, engaging script for a YouTube video:\n\"\"\"\n{{OUTLINE}}\n\"\"\"\n\nWrite a full narrative script that:\n- Is approximately 2000-3000 words\n- Use conversational language, as if a person is explaining something to a friend.\n- Vary sentence length and pacing to sound more natural when read aloud.\n- Make transitions smooth and logical to maintain flow between ideas.\n- Avoid overly complex or literary phrasing—keep it simple and human.\n- Do **not** include scene directions or camera cues—just spoken narration."}
                             className="min-h-[120px]"
                             {...field}
                             value={field.value ?? undefined}
@@ -369,7 +371,7 @@ export default function EnhancedStoryTemplateForm({
                 </CardContent>
               </Card>
 
-              <Card>
+              {/* <Card>
                 <CardHeader>
                   <CardTitle>Video Length (minutes) *</CardTitle>
                   <CardDescription>
@@ -401,7 +403,7 @@ export default function EnhancedStoryTemplateForm({
                     )}
                   />
                 </CardContent>
-              </Card>
+              </Card> */}
             </TabsContent>
 
             {/* Images Tab */}
@@ -480,7 +482,37 @@ export default function EnhancedStoryTemplateForm({
                         <FormLabel>Image Generation Prompt *</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Generate {{imageCount}} image prompts for this script: {{SCRIPT}}&#10;&#10;Create atmospheric, cinematic images that match the story mood. Each image should be described in detail with style, lighting, and composition notes."
+                            placeholder={`You are a visual storyteller assisting in the creation of cinematic AI-generated images for a video adaptation of a narrative story.
+
+The story will be presented as a narrated video, with visuals driven by a small, pre-defined set of AI-generated images. These images will be reused across different points in the video to maintain style consistency and production efficiency.
+
+Your task is to:
+
+1. Analyze the following story summary and chapter outlines.
+2. Identify the {{imageCount}} most visually distinct and reusable scenes or locations that would best represent the story’s key moments, moods, or transitions.
+3. For each selected scene, generate a cinematic AI image prompt that:
+   - Describes the setting or moment in great detail. Describe every element, angle, setting period, what's in the image and what's not in the image.
+   - Repeats key descriptive elements or aspects throughout the prompts, as each prompt will be used separately, and won't know what setting the other images are in, or look like or contain.
+   - Uses consistent visual style parameters (see style block below).
+   - Can be reused at multiple points in the story (emphasize atmospheric/mood-driven scenes over highly specific one-time events).
+4. Do not exceed {{imageCount}} images total.
+5. Do not use any NSFW words or descriptions.
+6. The prompts should generate imagery that is open to interpretation and subtle.
+
+Use this format for each image:
+
+Image [#]:
+- Description: [Short explanation of where in the story this scene fits or what it conveys]
+- Prompt: [Full AI prompt with visual style included]
+
+Append the following consistent style parameters to the end of each image prompt:
+Cinematic still frame, soft diffused lighting, desaturated colour palette, overcast ambient light, high contrast shadows, subtle film grain texture, shallow depth of field, vintage analogue realism, 1970s cold-war tone, slightly underexposed for a moody, isolated feel
+
+Begin your analysis and output the {{imageCount}} image prompts now.
+"""
+{{OUTLINE}}
+"""
+---`}
                             className="min-h-[100px]"
                             {...field}
                             value={field.value ?? undefined}
@@ -496,6 +528,31 @@ export default function EnhancedStoryTemplateForm({
                     name="imgPromptModel"
                     className="mt-4"
                     title="Image Prompt Generation Model"
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="imgAssignmentPrompt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Image Assignment Prompt</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder={"Match these image descriptions to specific segments of the script for optimal visual storytelling:\n\nOutline:\n\"\"\"\n{{OUTLINE}}\n\"\"\"\nScript:\n\"\"\"\n{{SCRIPT}}\n\"\"\"\n\nAvailable images:\n{{IMAGES}}\n"}
+                            className="min-h-[120px]"
+                            {...field}
+                            value={field.value ?? undefined}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <PromptModelSelector
+                    form={form}
+                    name="imgAssignmentModel"
+                    className="mt-4"
+                    title="Image Assignment Model"
                   />
 
                   {/* <Separator />
