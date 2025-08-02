@@ -377,6 +377,9 @@ const AiResponse = ({ videoId }: { videoId: number }) => {
           <TabsTrigger value="images" className="flex items-center gap-1">
             Image Prompt
           </TabsTrigger>
+          <TabsTrigger value="imageAssignments" className="flex items-center gap-1">
+            Image Assignment
+          </TabsTrigger>
         </TabsList>
         <div className="rounded p-3 bg-muted mt-1">
           <TabsContent value="idea" className="space-y-6">
@@ -392,6 +395,9 @@ const AiResponse = ({ videoId }: { videoId: number }) => {
             <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
           <TabsContent value="images" className="space-y-6">
+            <div dangerouslySetInnerHTML={{ __html: content }} />
+          </TabsContent>
+          <TabsContent value="imageAssignments" className="space-y-6">
             <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
         </div>
