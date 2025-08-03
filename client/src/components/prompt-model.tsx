@@ -49,7 +49,6 @@ export default function PromptModelSelector({ form, name, title, className }: Pr
                 <Input
                   type="number"
                   min={1}
-                  max={4000}
                   placeholder="e.g. 500"
                   {...field}
                 />
