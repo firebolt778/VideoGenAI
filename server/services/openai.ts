@@ -179,7 +179,15 @@ ${outline}
 
   async assignImagesToScript(outline: string, script: string, images: any[], customPrompt?: string, options?: PromptModel): Promise<ImageAssignment[]> {
     let prompt = customPrompt || `
-Match these image descriptions to specific segments of the script for optimal visual storytelling:
+You are assigning pre-generated images to sections of a narrative script.
+Instructions:
+1. You have a list of ${images.length} images, each with a unique filename and a brief description of its visual content.
+2. You also have a script. Your task is to assign **one image per continuous section** of the script (what would take approximately 30–60 seconds to narrate).
+3. Reuse the same image when appropriate, especially for recurring locations or moods.
+4. Prioritise **narrative and visual coherence**: assign images to sections of the script, based on what visually fits best, using the descriptions.
+5. When reusing an image, do so **only when the script revisits the same location or atmosphere**.
+6. You MUST NOT assign or create image filenames that are not in the list of images given. They are the only images available to assign.
+7. Do not leave any parts of the script out. Every part of the script needs to be returned with an image assigned to it.
 
 Outline:
 """
@@ -220,7 +228,7 @@ Respond with JSON in this exact format:
     }
   ]
 }`;
-console.log(prompt);
+
     try {
       const response = await openai.chat.completions.create({
         model: options?.model || "gpt-4o",
