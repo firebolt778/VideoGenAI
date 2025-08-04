@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,33 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TestTube, Play, Download, Eye, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { TestTube, Play, Download, Eye, AlertCircle, Clock, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Channel, VideoTemplate } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+
+const stages = [
+  "initialization",
+  "idea_selection",
+  "outline",
+  "script",
+  "hook",
+  "images",
+  "image_assignment",
+  "audio",
+  "rendering",
+];
+const stageLabels: Record<string, string> = {
+  "initialization": "Initialize",
+  "idea_selection": "Selected Idea",
+  "outline": "Created Outline",
+  "script": "Writed Full Script",
+  "hook": "Generated Hook",
+  "images": "Created Images",
+  "image_assignment": "Assigned Images",
+  "audio": "Generated Audio",
+  "rendering": "Rendered Video",
+};
 
 interface VideoTestPanelProps {
   channel: Channel;
@@ -26,29 +49,11 @@ interface TestProgress {
 export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
   const { toast } = useToast();
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
-  const [logs, setLogs] = useState<TestProgress[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [testProgress, setTestProgress] = useState<TestProgress | null>(null);
   const [currentVideoId, setCurrentVideoId] = useState<number | null>(null);
   const [isVideoPreviewOpen, setIsVideoPreviewOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const consoleRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!testProgress) return;
-    const lastLog = logs[logs.length - 1];
-    if (!lastLog || lastLog.progress !== testProgress.progress) {
-      setLogs(prev => [...prev, testProgress]);
-    }
-  }, [testProgress, logs]);
-  useEffect(() => {
-    if (consoleRef.current) {
-      consoleRef.current?.scrollTo({
-        top: consoleRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  }, [logs, consoleRef.current]);
 
   const { data: templates } = useQuery<VideoTemplate[]>({
     queryKey: ['/api/video-templates'],
@@ -108,30 +113,12 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
     }, 2000);
   };
 
-  const getNextStepMessage = (stage: string) => {
-    const labels: Record<string, string> = {
-      "initialization": "Initializing ...",
-      "idea_selection": "Creating Outline ...",
-      "outline": "Writing Script ...",
-      "script": "Generating Hook ...",
-      "hook": "Creating Images ...",
-      "images": "Assigning Images ...",
-      "image_assignment": "Generating Audio ...",
-      "audio": "Rendering Video ...",
-      "rendering": "Creating Thumbnail ...",
-      "thumbnail": "Finalizing ...",
-      "complete": "Completed"
-    };
-    return labels[stage] || stage;
-  }
-
   const handleGenerateTest = () => {
     if (!selectedTemplate) {
       toast({ title: "Please select a template", variant: "destructive" });
       return;
     }
     setTestProgress(null);
-    setLogs([]);
     setIsGenerating(true);
     generateTestVideoMutation.mutate({
       channelId: channel.id,
@@ -166,32 +153,14 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
     setIsVideoPreviewOpen(true);
   };
 
-  const getStageIcon = (stage: string) => {
-    switch (stage) {
-      case "complete":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case "error":
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Clock className="h-4 w-4 text-blue-500" />;
+  const getStageIcon = (curIndex: number, index: number) => {
+    if (curIndex < index) {
+      return <CheckCircle className="h-4 w-4 text-green-500" />;
+    } else if (curIndex === index) {
+      return <Clock className="h-4 w-4 text-blue-500" />;
+    } else {
+      return <div className="h-4 w-4" />;
     }
-  };
-
-  const getStageLabel = (stage: string) => {
-    const labels: Record<string, string> = {
-      "initialization": "Initializing",
-      "idea_selection": "Selecting Idea",
-      "outline": "Creating Outline",
-      "script": "Writing Script",
-      "hook": "Generating Hook",
-      "images": "Creating Images",
-      "image_assignment": "Assigning Images",
-      "audio": "Generating Audio",
-      "rendering": "Rendering Video",
-      "thumbnail": "Creating Thumbnail",
-      "complete": "Complete"
-    };
-    return labels[stage] || stage;
   };
 
   return (
@@ -235,20 +204,21 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
         {isGenerating && (
           <div className="space-y-4">
             <Progress value={testProgress?.progress || 0} className="h-2" />
-            <div
-              className="space-y-2 bg-gray-800 text-white rounded-lg p-4 max-h-36 overflow-auto"
-              ref={consoleRef}
-            >
-              {logs.map((log, index) => (
-                <div key={index}>{log.message}</div>
-              ))}
-              <div className="flex items-center gap-2">
-                {getStageIcon(testProgress?.stage || "initialization")}
-                <span>{testProgress?.progress || 0}%</span>
-                <span>{getNextStepMessage(testProgress?.stage || "initialization")}</span>
-              </div>
+            <div className="space-y-2 bg-gray-800 text-white rounded-lg p-4">
+              {Object.keys(stageLabels).map((stage, curIndex) => {
+                const index = stages.indexOf(testProgress?.stage || "");
+                return (
+                  <div key={stage} className="flex items-center gap-2">
+                    {getStageIcon(curIndex, index)}
+                    <div className="text-sm">{stageLabels[stage]}</div>
+                  </div>
+                )
+              })}
               {!!error && (
-                <div className="text-red-400">{error}</div>
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                  <div className="text-red-400">{error}</div>
+                </div>
               )}
             </div>
           </div>
