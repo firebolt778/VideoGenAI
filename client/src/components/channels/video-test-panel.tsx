@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,10 +9,10 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TestTube, Play, Download, Eye, AlertCircle, Clock, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Channel, VideoTemplate } from "@shared/schema";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 const stages = [
   "initialization",
@@ -210,7 +211,16 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
                 return (
                   <div key={stage} className="flex items-center gap-2">
                     {getStageIcon(curIndex, index)}
-                    <div className="text-sm">{stageLabels[stage]}</div>
+                    <div
+                      className={cn(
+                        "text-sm",
+                        curIndex < index && "text-green-400",
+                        curIndex === index && "text-blue-400",
+                        curIndex > index && "text-gray-400"
+                      )}
+                    >
+                      {stageLabels[stage]}
+                    </div>
                   </div>
                 )
               })}
