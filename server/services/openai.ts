@@ -92,6 +92,7 @@ Write a full narrative script that:
 - Maintains suspense throughout
 `;
     prompt += `
+Each chapter must be separated by +++.
 Enclose the script content between --- markers like this:
 ---
 [Your script here]
@@ -182,12 +183,12 @@ ${outline}
 You are assigning pre-generated images to sections of a narrative script.
 Instructions:
 1. You have a list of ${images.length} images, each with a unique filename and a brief description of its visual content.
-2. You also have a script. Your task is to assign **one image per continuous section** of the script (what would take approximately 30–60 seconds to narrate).
-3. Reuse the same image when appropriate, especially for recurring locations or moods.
-4. Prioritise **narrative and visual coherence**: assign images to sections of the script, based on what visually fits best, using the descriptions.
-5. When reusing an image, do so **only when the script revisits the same location or atmosphere**.
-6. You MUST NOT assign or create image filenames that are not in the list of images given. They are the only images available to assign.
-7. Do not leave any parts of the script out. Every part of the script needs to be returned with an image assigned to it.
+2. You also have a script. Your task is to assign **one image per continuous section** of the script.
+3. Prioritise **narrative and visual coherence**: assign images to sections of the script, based on what visually fits best, using the descriptions.
+4. You MUST NOT assign or create image filenames that are not in the list of images given. They are the only images available to assign.
+5. Do not skip any parts of the script out. Every part of the script must be returned with an image assigned to it.
+6. Stay strictly within chapter boundaries (Each chapter is separated by +++). Do **not** assign script segments across chapters.
+7. If the current image file is the previous image file, attach the current script segment to that of the previous image.
 
 Outline:
 """
@@ -200,14 +201,16 @@ ${script}
 """
 
 Available images:
+"""
 ${JSON.stringify(images, undefined, 2)}
+"""
 `;
     prompt += `
 Requirements:
-- Include all images in the response unless they don't match any script segment.
-- Include all chapters in the response.
-- Each chapter must include at least 1 image.
-- The result scriptSegments must include all of the original script.
+- Include **every chapter**, with **at least one image per chapter**.
+- **Include all images and scripts in the response**.
+- Reuse an image **only** when the same setting or atmosphere is clearly revisited (e.g., same location, repeated dream, returning to cabin, etc.).
+- If the segment does not match the image, add it to the previous image.
 
 Respond with JSON in this exact format:
 {

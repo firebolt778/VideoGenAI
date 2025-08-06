@@ -82,6 +82,7 @@ export class VideoWorkflowService {
         { videoId, stage: "outline", channelId, templateId: template.id, testMode, retryCount: 0, maxRetries: 3, error: new Error("Initial error"), timestamp: new Date() },
         "openai"
       );
+      console.log("Generated outline");
       await fs.writeFile(path.join(compositionsDir, 'outline.txt'), JSON.stringify(structuredClone(outline), undefined, 2));
       context.outline = outline.raw;
 
@@ -93,6 +94,7 @@ export class VideoWorkflowService {
       // Step 3: Generate full script
       const fullScript = await this.generateFullScript(template, context);
       context.script = fullScript;
+      console.log("Generated full script");
       await fs.writeFile(path.join(compositionsDir, 'fullScript.txt'), fullScript);
       await this.logProgress(videoId, "script", 20, "Generated full script");
 
@@ -108,6 +110,7 @@ export class VideoWorkflowService {
       // Step 5: Generate images
       const images = await this.generateImages(template, context);
       await fs.writeFile(path.join(compositionsDir, 'images.txt'), JSON.stringify(structuredClone(images), undefined, 2));
+      console.log("Generated images:", images.length);
       context.images = images;
       await this.logProgress(videoId, "images", 45, `Generated ${images.length} images`);
 
@@ -122,6 +125,7 @@ export class VideoWorkflowService {
 
       // Step 8: Render video with Remotion
       const videoConfig = this.buildVideoConfig(title, audioSegments, imageAssignments, template, channel, bgAudio, hookAudio);
+      await fs.writeFile(path.join(compositionsDir, 'videoConfig.txt'), JSON.stringify(structuredClone(videoConfig), null, 2));
       const videoPath = await remotionService.renderVideo(videoConfig, `output/video_${videoId}.mp4`);
       await this.logProgress(videoId, "rendering", 85, "Video rendering completed");
 
