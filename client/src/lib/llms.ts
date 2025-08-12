@@ -1,4 +1,5 @@
 export const llmModels = [
+  { value: "gpt-5", label: "GPT 5" },
   { value: "gpt-4.1", label: "GPT 4.1" },
   { value: "gpt-4.1-mini", label: "GPT 4.1 Mini" },
   { value: "gpt-4o", label: "GPT 4o" },

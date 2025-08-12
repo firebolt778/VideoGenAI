@@ -73,6 +73,7 @@ export default function PromptModelSelector({ form, name, title, className }: Pr
                   max={2}
                   step={0.1}
                   placeholder="0.7"
+                  disabled={form.watch(`${name}.model`) === "gpt-5"}
                   {...field}
                 />
               </FormControl>
