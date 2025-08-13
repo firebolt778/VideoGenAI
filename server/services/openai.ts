@@ -51,7 +51,7 @@ Respond with JSON in this exact format:
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model === "gpt-5") {
+      if (options?.model !== "gpt-5") {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -106,7 +106,7 @@ Enclose the script content between --- markers like this:
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model === "gpt-5") {
+      if (options?.model !== "gpt-5") {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -160,7 +160,7 @@ ${outline}
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model === "gpt-5") {
+      if (options?.model !== "gpt-5") {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -249,7 +249,7 @@ Respond with JSON in this exact format:
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model === "gpt-5") {
+      if (options?.model !== "gpt-5") {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -371,7 +371,7 @@ Respond with JSON in this exact format:
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model === "gpt-5") {
+      if (options?.model !== "gpt-5") {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -421,7 +421,7 @@ Keep it under 1000 characters.`;
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model === "gpt-5") {
+      if (options?.model !== "gpt-5") {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -467,7 +467,7 @@ Create a single, detailed prompt for thumbnail generation.`;
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model === "gpt-5") {
+      if (options?.model !== "gpt-5") {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
