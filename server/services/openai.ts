@@ -50,6 +50,15 @@ Respond with JSON in this exact format:
 }`;
 
     try {
+      let additionalParams: { [key: string]: any } = {};
+      if (options?.model === "gpt-5") {
+        additionalParams = {
+          temperature: options?.temperature ?? 0.7,
+          frequency_penalty: options?.frequencyPenalty ?? 0,
+          max_completion_tokens: options?.maxTokens || 4000,
+          top_p: options?.topP || 1.0
+        }
+      }
       const response = await openai.chat.completions.create({
         model: options?.model || "gpt-4o",
         messages: [
@@ -63,10 +72,7 @@ Respond with JSON in this exact format:
           }
         ],
         response_format: { type: "json_object" },
-        temperature: options?.temperature ?? 0.7,
-        frequency_penalty: options?.frequencyPenalty ?? 0,
-        max_completion_tokens: options?.maxTokens || 4000,
-        top_p: options?.topP || 1.0
+        ...additionalParams
       });
 
       const result = JSON.parse(response.choices[0].message.content || "{}");
@@ -99,6 +105,15 @@ Enclose the script content between --- markers like this:
 ---`;
 
     try {
+      let additionalParams: { [key: string]: any } = {};
+      if (options?.model === "gpt-5") {
+        additionalParams = {
+          temperature: options?.temperature ?? 0.7,
+          frequency_penalty: options?.frequencyPenalty ?? 0,
+          max_completion_tokens: options?.maxTokens || 4000,
+          top_p: options?.topP || 1.0
+        }
+      }
       const response = await openai.chat.completions.create({
         model: options?.model || "gpt-4o",
         messages: [
@@ -111,10 +126,7 @@ Enclose the script content between --- markers like this:
             content: prompt
           }
         ],
-        temperature: options?.temperature ?? 0.7,
-        frequency_penalty: options?.frequencyPenalty ?? 0,
-        max_completion_tokens: options?.maxTokens || 4000,
-        top_p: options?.topP || 1.0
+        ...additionalParams
       });
 
       const content = response.choices[0].message.content || "";
@@ -147,6 +159,15 @@ ${outline}
 """`;
 
     try {
+      let additionalParams: { [key: string]: any } = {};
+      if (options?.model === "gpt-5") {
+        additionalParams = {
+          temperature: options?.temperature ?? 0.7,
+          frequency_penalty: options?.frequencyPenalty ?? 0,
+          max_completion_tokens: options?.maxTokens || 4000,
+          top_p: options?.topP || 1.0
+        }
+      }
       const response = await openai.chat.completions.create({
         model: options?.model || "gpt-4o",
         messages: [
@@ -159,10 +180,7 @@ ${outline}
             content: prompt
           }
         ],
-        temperature: options?.temperature ?? 0.7,
-        frequency_penalty: options?.frequencyPenalty ?? 0,
-        max_completion_tokens: options?.maxTokens || 4000,
-        top_p: options?.topP || 1.0
+        ...additionalParams
       });
 
       const content = response.choices[0].message.content || "";
@@ -352,6 +370,15 @@ Respond with JSON in this exact format:
 }`;
 
     try {
+      let additionalParams: { [key: string]: any } = {};
+      if (options?.model === "gpt-5") {
+        additionalParams = {
+          temperature: options?.temperature ?? 0.7,
+          frequency_penalty: options?.frequencyPenalty ?? 0,
+          max_completion_tokens: options?.maxTokens || 4000,
+          top_p: options?.topP || 1.0
+        }
+      }
       const response = await openai.chat.completions.create({
         model: options?.model || "gpt-4o",
         messages: [
@@ -365,10 +392,7 @@ Respond with JSON in this exact format:
           }
         ],
         response_format: { type: "json_object" },
-        temperature: options?.temperature ?? 0.7,
-        frequency_penalty: options?.frequencyPenalty ?? 0,
-        max_completion_tokens: options?.maxTokens || 4000,
-        top_p: options?.topP || 1.0
+        ...additionalParams
       });
 
       const result = JSON.parse(response.choices[0].message.content || "{}");
@@ -396,6 +420,15 @@ The description should:
 Keep it under 1000 characters.`;
 
     try {
+      let additionalParams: { [key: string]: any } = {};
+      if (options?.model === "gpt-5") {
+        additionalParams = {
+          temperature: options?.temperature ?? 0.7,
+          frequency_penalty: options?.frequencyPenalty ?? 0,
+          max_completion_tokens: options?.maxTokens || 300,
+          top_p: options?.topP || 1.0
+        }
+      }
       const response = await openai.chat.completions.create({
         model: options?.model || "gpt-4o",
         messages: [
@@ -408,10 +441,7 @@ Keep it under 1000 characters.`;
             content: prompt
           }
         ],
-        temperature: options?.temperature ?? 0.7,
-        frequency_penalty: options?.frequencyPenalty ?? 0,
-        max_completion_tokens: options?.maxTokens || 300,
-        top_p: options?.topP || 1.0
+        ...additionalParams
       });
 
       return response.choices[0].message.content || "";
@@ -436,6 +466,15 @@ The thumbnail should be:
 Create a single, detailed prompt for thumbnail generation.`;
 
     try {
+      let additionalParams: { [key: string]: any } = {};
+      if (options?.model === "gpt-5") {
+        additionalParams = {
+          temperature: options?.temperature ?? 0.7,
+          frequency_penalty: options?.frequencyPenalty ?? 0,
+          max_completion_tokens: options?.maxTokens || 4000,
+          top_p: options?.topP || 1.0
+        }
+      }
       const response = await openai.chat.completions.create({
         model: options?.model || "gpt-4o",
         messages: [
@@ -448,10 +487,7 @@ Create a single, detailed prompt for thumbnail generation.`;
             content: prompt
           }
         ],
-        temperature: options?.temperature ?? 0.7,
-        frequency_penalty: options?.frequencyPenalty ?? 0,
-        max_completion_tokens: options?.maxTokens || 4000,
-        top_p: options?.topP || 1.0
+        ...additionalParams
       });
 
       return response.choices[0].message.content || "";
