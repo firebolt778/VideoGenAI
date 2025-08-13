@@ -178,22 +178,19 @@ ${outline}
     }
   }
 
-  async assignImagesToScript(outline: string, script: string, images: any[], customPrompt?: string, options?: PromptModel): Promise<ImageAssignment[]> {
+  async assignImagesToScript(script: string, images: any[], customPrompt?: string, options?: PromptModel): Promise<ImageAssignment[]> {
+    const imgDescriptions = images.map(img => ({
+      filename: img.filename,
+      description: img.description || "No description available"
+    }));
     let prompt = customPrompt || `
 You are assigning pre-generated images to sections of a narrative script.
 Instructions:
 1. You have a list of ${images.length} images, each with a unique filename and a brief description of its visual content.
-2. You also have a script. Your task is to assign **one image per continuous section** of the script.
-3. Prioritise **narrative and visual coherence**: assign images to sections of the script, based on what visually fits best, using the descriptions.
-4. You MUST NOT assign or create image filenames that are not in the list of images given. They are the only images available to assign.
-5. Do not skip any parts of the script out. Every part of the script must be returned with an image assigned to it.
-6. Stay strictly within chapter boundaries (Each chapter is separated by +++). Do **not** assign script segments across chapters.
-7. If the current image file is the previous image file, attach the current script segment to that of the previous image.
-
-Outline:
-"""
-${outline}
-"""
+2. You also have a script. Your task is to split the script and select and arrange the appropriate images for it.
+3. You MUST NOT assign or create image filenames that are not in the list of images given. They are the only images available to assign. If there is no image matching the segment in the given array, append it with the previous segment.
+4. Don't skip any segment of the script.
+5. Stay strictly within chapter boundaries (Each chapter is separated by +++). Do **not** assign script segments across chapters.
 
 Full Script:
 """
@@ -202,12 +199,12 @@ ${script}
 
 Available images:
 """
-${JSON.stringify(images, undefined, 2)}
+${JSON.stringify(imgDescriptions, undefined, 2)}
 """
 `;
     prompt += `
 Requirements:
-- Include **every chapter**, with **at least one image per chapter**.
+- Include **every chapter** (including prologue and epilogue), with **at least one image per chapter**.
 - **Include all images and scripts in the response**.
 - Reuse an image **only** when the same setting or atmosphere is clearly revisited (e.g., same location, repeated dream, returning to cabin, etc.).
 - If the segment does not match the image, add it to the previous image.
@@ -216,7 +213,7 @@ Respond with JSON in this exact format:
 {
   "assignments": [
     {
-      "chapter": "Chapter 1. Exact title from the outline",
+      "chapter": "Chapter 1. Exact title from the script",
       "images": [
         {
           "filename": "Exact filename from the images list",
@@ -233,7 +230,16 @@ Respond with JSON in this exact format:
 }`;
 
     try {
-      const response = await openai.chat.completions.create({
+      let additionalParams: { [key: string]: any } = {};
+      if (options?.model === "gpt-5") {
+        additionalParams = {
+          temperature: options?.temperature ?? 0.7,
+          frequency_penalty: options?.frequencyPenalty ?? 0,
+          max_completion_tokens: options?.maxTokens || 4000,
+          top_p: options?.topP || 1.0
+        }
+      }
+      const response1 = await openai.chat.completions.create({
         model: options?.model || "gpt-4o",
         messages: [
           {
@@ -246,14 +252,69 @@ Respond with JSON in this exact format:
           }
         ],
         response_format: { type: "json_object" },
-        temperature: options?.temperature ?? 0.7,
-        frequency_penalty: options?.frequencyPenalty ?? 0,
-        max_completion_tokens: options?.maxTokens || 4000,
-        top_p: options?.topP || 1.0
+        ...additionalParams
       });
 
-      const result = JSON.parse(response.choices[0].message.content || "{}");
-      return result.assignments || [];
+      const result1 = JSON.parse(response1.choices[0].message.content || "{}");
+      const assignments = result1.assignments || [];
+      const processPrompt = `
+Review this assignmets and update them if necessary. Ensure that:
+- If any part of script is missed in the assignment, add it to the correct position.
+- If the filename is the same as the previous image (only in same chapter), append the script segment to the previous image.
+- If any image file is missed in the assignment, add it to the correct position.
+
+Full Script:
+"""
+${script}
+"""
+
+Assignments:
+"""
+${JSON.stringify(assignments, null, 2)}
+"""
+
+Available images:
+"""
+${JSON.stringify(imgDescriptions, null, 2)}
+"""
+
+Respond with JSON in this exact format:
+{
+  "assignments": [
+    {
+      "chapter": "Chapter 1. Exact title from the assignment",
+      "images": [
+        {
+          "filename": "Exact filename from the assignment list",
+          "scriptSegment": "...",
+        },
+        {
+          "filename": "Exact filename from the assignment list",
+          "scriptSegment": "...",
+        },
+        ...
+      ]
+    }
+  ]
+}`;
+
+      const response2 = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert video editor who understands visual storytelling and pacing."
+          },
+          {
+            role: "user",
+            content: processPrompt
+          }
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const result2 = JSON.parse(response2.choices[0].message.content || "{}");
+      return result2.assignments || [];
     } catch (error) {
       throw new Error(`Failed to assign images to script: ${(error as Error).message}`);
     }

@@ -250,7 +250,7 @@ export class VideoWorkflowService {
 
   private async assignImages(template: VideoTemplate, context: ShortcodeContext) {
     const prompt = ShortcodeProcessor.process(template.imgAssignmentPrompt || "", context);
-    return await openaiService.assignImagesToScript(context.outline || "", context.script || "", context.images || [], prompt, template.imgAssignmentModel || undefined);
+    return await openaiService.assignImagesToScript(context.script || "", context.images || [], prompt, template.imgAssignmentModel || undefined);
   }
 
   private async generateHook(hookTemplate: HookTemplate, context: ShortcodeContext): Promise<string> {
