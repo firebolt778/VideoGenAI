@@ -3,8 +3,13 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
 import { schedulerService } from "./services/scheduler";
+import path from "path";
 
 const app = express();
+app.use('/uploads', express.static(path.join(process.cwd(), '../uploads')));
+app.use('/ai-response', express.static(path.join(process.cwd(), '../ai-response')));
+app.use('/output', express.static(path.join(process.cwd(), '../output')));
+app.use('/thumbnails', express.static(path.join(process.cwd(), '../thumbnails')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
