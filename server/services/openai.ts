@@ -51,7 +51,7 @@ Respond with JSON in this exact format:
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model !== "gpt-5") {
+      if (!options?.model.startsWith("gpt-5")) {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -71,6 +71,7 @@ Respond with JSON in this exact format:
             content: prompt
           }
         ],
+        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
         response_format: { type: "json_object" },
         ...additionalParams
       });
@@ -106,7 +107,7 @@ Enclose the script content between --- markers like this:
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model !== "gpt-5") {
+      if (!options?.model.startsWith("gpt-5")) {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -115,7 +116,7 @@ Enclose the script content between --- markers like this:
         }
       }
       const response = await openai.chat.completions.create({
-        model: options?.model || "gpt-4o",
+        model: options?.model || "gpt-5",
         messages: [
           {
             role: "system",
@@ -126,6 +127,7 @@ Enclose the script content between --- markers like this:
             content: prompt
           }
         ],
+        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
         ...additionalParams
       });
 
@@ -160,7 +162,7 @@ ${outline}
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model !== "gpt-5") {
+      if (!options?.model.startsWith("gpt-5")) {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -169,7 +171,7 @@ ${outline}
         }
       }
       const response = await openai.chat.completions.create({
-        model: options?.model || "gpt-4o",
+        model: options?.model || "gpt-5",
         messages: [
           {
             role: "system",
@@ -180,6 +182,7 @@ ${outline}
             content: prompt
           }
         ],
+        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
         ...additionalParams
       });
 
@@ -215,7 +218,7 @@ Keep it under 1000 characters.`;
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model !== "gpt-5") {
+      if (!options?.model.startsWith("gpt-5")) {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -224,7 +227,7 @@ Keep it under 1000 characters.`;
         }
       }
       const response = await openai.chat.completions.create({
-        model: options?.model || "gpt-4o",
+        model: options?.model || "gpt-5",
         messages: [
           {
             role: "system",
@@ -235,6 +238,7 @@ Keep it under 1000 characters.`;
             content: prompt
           }
         ],
+        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
         ...additionalParams
       });
 
@@ -247,7 +251,7 @@ Keep it under 1000 characters.`;
   async generateVisualStyle(prompt: string, options?: PromptModel): Promise<string> {
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model !== "gpt-5") {
+      if (!options?.model.startsWith("gpt-5")) {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -267,6 +271,7 @@ Keep it under 1000 characters.`;
             content: prompt
           }
         ],
+        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
         ...additionalParams
       });
 
@@ -279,7 +284,7 @@ Keep it under 1000 characters.`;
   async generateChapterContent(prompt: string, options?: PromptModel): Promise<string> {
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model !== "gpt-5") {
+      if (!options?.model.startsWith("gpt-5")) {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -299,6 +304,7 @@ Keep it under 1000 characters.`;
             content: prompt
           }
         ],
+        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
         ...additionalParams
       });
 
@@ -314,7 +320,7 @@ Keep it under 1000 characters.`;
   }> {
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model !== "gpt-5") {
+      if (!options?.model.startsWith("gpt-5")) {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -352,6 +358,7 @@ RESPOND WITH JSON ONLY. EXACT FORMAT (no markdown, no comments, no trailing comm
             content: prompt
           }
         ],
+        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
         response_format: { type: "json_object" },
         ...additionalParams
       });
@@ -383,7 +390,7 @@ Create a single, detailed prompt for thumbnail generation.`;
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (options?.model !== "gpt-5") {
+      if (!options?.model.startsWith("gpt-5")) {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
@@ -392,7 +399,7 @@ Create a single, detailed prompt for thumbnail generation.`;
         }
       }
       const response = await openai.chat.completions.create({
-        model: options?.model || "gpt-4o",
+        model: options?.model || "gpt-5",
         messages: [
           {
             role: "system",
@@ -403,6 +410,7 @@ Create a single, detailed prompt for thumbnail generation.`;
             content: prompt
           }
         ],
+        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
         ...additionalParams
       });
 
