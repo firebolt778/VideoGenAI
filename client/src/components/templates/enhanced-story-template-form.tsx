@@ -92,12 +92,14 @@ export default function EnhancedStoryTemplateForm({
       storyOutlinePrompt: template?.storyOutlinePrompt || "",
       outlinePromptModel: template?.outlinePromptModel || defaultPromptModel,
       fullScriptPrompt: template?.fullScriptPrompt || "",
-      imgAssignmentPrompt: template?.imgAssignmentPrompt || "",
-      imgAssignmentModel: template?.imgAssignmentModel || defaultPromptModel,
+      visualStylePrompt: template?.visualStylePrompt || "",
+      visualStyleModel: template?.visualStyleModel || defaultPromptModel,
       scriptPromptModel: template?.scriptPromptModel || defaultPromptModel,
       videoLength: template?.videoLength || 60,
-      imagePrompt: template?.imagePrompt || "",
-      imgPromptModel: template?.imgPromptModel || defaultPromptModel,
+      chapterImagePrompt: template?.chapterImagePrompt || "",
+      chapterImageModel: template?.chapterImageModel || defaultPromptModel,
+      chapterContentPrompt: template?.chapterContentPrompt || "",
+      chapterContentModel: template?.chapterContentModel || defaultPromptModel,
       imageCount: template?.imageCount || 8,
       imageModel: template?.imageModel || "flux-schnell",
       imageFallbackModel: template?.imageFallbackModel || "dalle-3",
@@ -371,6 +373,40 @@ export default function EnhancedStoryTemplateForm({
                 </CardContent>
               </Card>
 
+              <Card>
+                <CardHeader>
+                  <CardTitle>Chapter Content Generation *</CardTitle>
+                  <CardDescription>
+                    Generate detailed content for each chapter based on the full script
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <FormField
+                    control={form.control}
+                    name="chapterContentPrompt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Chapter Content Prompt</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            className="min-h-[120px]"
+                            {...field}
+                            value={field.value ?? undefined}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <PromptModelSelector
+                    form={form}
+                    name="chapterContentModel"
+                    className="mt-4"
+                    title="Chapter Content Model"
+                  />
+                </CardContent>
+              </Card>
+
               {/* <Card>
                 <CardHeader>
                   <CardTitle>Video Length (minutes) *</CardTitle>
@@ -476,43 +512,12 @@ export default function EnhancedStoryTemplateForm({
 
                   <FormField
                     control={form.control}
-                    name="imagePrompt"
+                    name="visualStylePrompt"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Image Generation Prompt *</FormLabel>
+                        <FormLabel>Visual Style Prompt *</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder={`You are a visual storyteller assisting in the creation of cinematic AI-generated images for a video adaptation of a narrative story.
-
-The story will be presented as a narrated video, with visuals driven by a small, pre-defined set of AI-generated images. These images will be reused across different points in the video to maintain style consistency and production efficiency.
-
-Your task is to:
-
-1. Analyze the following story summary and chapter outlines.
-2. Identify the {{imageCount}} most visually distinct and reusable scenes or locations that would best represent the story’s key moments, moods, or transitions.
-3. For each selected scene, generate a cinematic AI image prompt that:
-   - Describes the setting or moment in great detail. Describe every element, angle, setting period, what's in the image and what's not in the image.
-   - Repeats key descriptive elements or aspects throughout the prompts, as each prompt will be used separately, and won't know what setting the other images are in, or look like or contain.
-   - Uses consistent visual style parameters (see style block below).
-   - Can be reused at multiple points in the story (emphasize atmospheric/mood-driven scenes over highly specific one-time events).
-4. Do not exceed {{imageCount}} images total.
-5. Do not use any NSFW words or descriptions.
-6. The prompts should generate imagery that is open to interpretation and subtle.
-
-Use this format for each image:
-
-Image [#]:
-- Description: [Short explanation of where in the story this scene fits or what it conveys]
-- Prompt: [Full AI prompt with visual style included]
-
-Append the following consistent style parameters to the end of each image prompt:
-Cinematic still frame, soft diffused lighting, desaturated colour palette, overcast ambient light, high contrast shadows, subtle film grain texture, shallow depth of field, vintage analogue realism, 1970s cold-war tone, slightly underexposed for a moody, isolated feel
-
-Begin your analysis and output the {{imageCount}} image prompts now.
-"""
-{{OUTLINE}}
-"""
----`}
                             className="min-h-[100px]"
                             {...field}
                             value={field.value ?? undefined}
@@ -525,20 +530,19 @@ Begin your analysis and output the {{imageCount}} image prompts now.
 
                   <PromptModelSelector
                     form={form}
-                    name="imgPromptModel"
+                    name="visualStyleModel"
                     className="mt-4"
-                    title="Image Prompt Generation Model"
+                    title="Visual Style Model"
                   />
 
                   <FormField
                     control={form.control}
-                    name="imgAssignmentPrompt"
+                    name="chapterImagePrompt"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Image Assignment Prompt</FormLabel>
+                        <FormLabel>Chapter Image Prompt</FormLabel>
                         <FormControl>
                           <Textarea 
-                            placeholder={"Match these image descriptions to specific segments of the script for optimal visual storytelling:\n\nOutline:\n\"\"\"\n{{OUTLINE}}\n\"\"\"\nScript:\n\"\"\"\n{{SCRIPT}}\n\"\"\"\n\nAvailable images:\n{{IMAGES}}\n"}
                             className="min-h-[120px]"
                             {...field}
                             value={field.value ?? undefined}
@@ -550,9 +554,9 @@ Begin your analysis and output the {{imageCount}} image prompts now.
                   />
                   <PromptModelSelector
                     form={form}
-                    name="imgAssignmentModel"
+                    name="chapterImageModel"
                     className="mt-4"
-                    title="Image Assignment Model"
+                    title="Chapter Image Model"
                   />
 
                   {/* <Separator />

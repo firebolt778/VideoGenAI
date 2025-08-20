@@ -84,8 +84,8 @@ export class ValidationService {
     if (!template.storyOutlinePrompt) {
       errors.push("Story outline prompt is required");
     }
-    if (!template.imagePrompt) {
-      errors.push("Image prompt is required");
+    if (!template.fullScriptPrompt) {
+      errors.push("Full script prompt is required");
     }
     if (!template.ideasList) {
       errors.push("Ideas list is required");

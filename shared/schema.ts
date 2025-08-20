@@ -12,7 +12,7 @@ export type PromptModel = {
 }
 
 export const defaultPromptModel: PromptModel = {
-  model: "gpt-4o",
+  model: "gpt-5",
   temperature: 0.7,
   maxTokens: 8192,
   topP: 0.9,
@@ -81,16 +81,20 @@ export const videoTemplates = pgTable("video_templates", {
   fullScriptPrompt: text("full_script_prompt"),
   scriptPromptModel: jsonb("script_prompt_model").$type<PromptModel>().default(defaultPromptModel),
   videoLength: integer("video_length"),
-  imgAssignmentPrompt: text("img_assignment_prompt"),
-  imgAssignmentModel: jsonb("img_assignment_model").$type<PromptModel>().default(defaultPromptModel),
-  imagePrompt: text("image_prompt"),
-  imgPromptModel: jsonb("img_prompt_model").$type<PromptModel>().default(defaultPromptModel),
   imageCount: integer("image_count").default(8),
+  imageCountRange: jsonb("image_count_range").$type<{ min: number; max: number }>().default({ min: 3, max: 6 }),
   imageModel: text("image_model").default("flux-schnell"),
   imageFallbackModel: text("image_fallback_model").default("dalle-3"),
   imageSettings: jsonb("image_settings"),
   heroImageModel: text("hero_image_model").default("flux-pro"),
   heroImageEnabled: boolean("hero_image_enabled").default(false),
+  // --- New workflow properties ---
+  visualStylePrompt: text("visual_style_prompt"),
+  visualStyleModel: jsonb("visual_style_model").$type<PromptModel>().default(defaultPromptModel),
+  chapterContentPrompt: text("chapter_content_prompt"),
+  chapterContentModel: jsonb("chapter_content_model").$type<PromptModel>().default(defaultPromptModel),
+  chapterImagePrompt: text("chapter_image_prompt"),
+  chapterImageModel: jsonb("chapter_image_model").$type<PromptModel>().default(defaultPromptModel),
   audioModel: text("audio_model").default("eleven_labs"),
   audioVoices: text("audio_voices").array(),
   audioPauseGap: integer("audio_pause_gap").default(500), // milliseconds

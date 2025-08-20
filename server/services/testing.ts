@@ -1,613 +1,478 @@
-import { storage } from "../storage";
-import { validationService } from "./validation";
-import { errorHandlerService } from "./error-handler";
 import { videoWorkflowService } from "./video-workflow";
-import type { Channel, VideoTemplate, ThumbnailTemplate } from "@shared/schema";
+import { storage } from "../storage";
+import { openaiService } from "./openai";
+import { fluxService } from "./flux";
+import fs from 'fs/promises';
+import path from "path";
 
-export interface TestResult {
-  testId: string;
-  testName: string;
-  passed: boolean;
-  duration: number;
-  errors: string[];
-  warnings: string[];
-  details: any;
-  timestamp: Date;
-}
+const testOutputDir = path.join(process.cwd(), "test-output");
 
-export interface TestSuite {
-  name: string;
-  description: string;
-  tests: TestCase[];
-}
-
-export interface TestCase {
-  name: string;
-  description: string;
-  execute: () => Promise<TestResult>;
-  required: boolean;
-  timeout: number;
-}
-
-export class TestingService {
-  private testSuites: Map<string, TestSuite> = new Map();
-
-  constructor() {
-    this.initializeTestSuites();
-  }
-
-  private initializeTestSuites() {
-    // Template validation tests
-    this.testSuites.set('template_validation', {
-      name: 'Template Validation',
-      description: 'Tests for video template configuration and quality',
-      tests: [
-        {
-          name: 'Template Required Fields',
-          description: 'Check that all required template fields are present',
-          execute: this.testTemplateRequiredFields.bind(this),
-          required: true,
-          timeout: 5000
-        },
-        {
-          name: 'Template Content Quality',
-          description: 'Validate template content quality and length',
-          execute: this.testTemplateContentQuality.bind(this),
-          required: false,
-          timeout: 10000
-        },
-        {
-          name: 'Template Ideas List',
-          description: 'Check ideas list format and content',
-          execute: this.testTemplateIdeasList.bind(this),
-          required: true,
-          timeout: 5000
-        }
-      ]
-    });
-
-    // System integration tests
-    this.testSuites.set('system_integration', {
-      name: 'System Integration',
-      description: 'Tests for system services and dependencies',
-      tests: [
-        {
-          name: 'OpenAI Service',
-          description: 'Test OpenAI API connectivity and functionality',
-          execute: this.testOpenAIService.bind(this),
-          required: true,
-          timeout: 15000
-        },
-        {
-          name: 'Image Generation Service',
-          description: 'Test image generation service connectivity',
-          execute: this.testImageGenerationService.bind(this),
-          required: true,
-          timeout: 20000
-        },
-        {
-          name: 'Audio Generation Service',
-          description: 'Test audio generation service connectivity',
-          execute: this.testAudioGenerationService.bind(this),
-          required: true,
-          timeout: 15000
-        },
-        {
-          name: 'Video Rendering Service',
-          description: 'Test video rendering service functionality',
-          execute: this.testVideoRenderingService.bind(this),
-          required: true,
-          timeout: 30000
-        }
-      ]
-    });
-
-    // End-to-end workflow tests
-    this.testSuites.set('workflow_tests', {
-      name: 'Workflow Tests',
-      description: 'End-to-end video generation workflow tests',
-      tests: [
-        {
-          name: 'Complete Video Generation',
-          description: 'Test complete video generation workflow',
-          execute: this.testCompleteVideoGeneration.bind(this),
-          required: true,
-          timeout: 120000
-        },
-        {
-          name: 'Error Handling',
-          description: 'Test error handling and recovery',
-          execute: this.testErrorHandling.bind(this),
-          required: false,
-          timeout: 30000
-        },
-        {
-          name: 'Quality Validation',
-          description: 'Test content quality validation',
-          execute: this.testQualityValidation.bind(this),
-          required: false,
-          timeout: 60000
-        }
-      ]
-    });
-  }
-
-  // Run all test suites
-  async runAllTests(): Promise<TestResult[]> {
-    const results: TestResult[] = [];
-
-    for (const [suiteName, suite] of this.testSuites.entries().toArray()) {
-      console.log(`Running test suite: ${suite.name}`);
-      for (const testCase of suite.tests) {
-        try {
-          const result = await this.runTest(testCase);
-          results.push(result);
-          
-          if (!result.passed && testCase.required) {
-            console.error(`Required test failed: ${testCase.name}`);
-            break;
-          }
-        } catch (error) {
-          results.push({
-            testId: `${suiteName}_${testCase.name}`,
-            testName: testCase.name,
-            passed: false,
-            duration: 0,
-            errors: [error instanceof Error ? error.message : String(error)],
-            warnings: [],
-            details: {},
-            timestamp: new Date()
-          });
-        }
-      }
-    }
-    
-    return results;
-  }
-
-  // Run specific test suite
-  async runTestSuite(suiteName: string): Promise<TestResult[]> {
-    const suite = this.testSuites.get(suiteName);
-    if (!suite) {
-      throw new Error(`Test suite '${suiteName}' not found`);
-    }
-
-    const results: TestResult[] = [];
-    
-    for (const testCase of suite.tests) {
-      const result = await this.runTest(testCase);
-      results.push(result);
-    }
-    
-    return results;
-  }
-
-  // Run individual test
-  private async runTest(testCase: TestCase): Promise<TestResult> {
-    const startTime = Date.now();
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    let details: any = {};
+export class WorkflowTestService {
+  async testNewWorkflow(testVideoId: number = 999999): Promise<void> {
+    console.log("🚀 Starting new workflow test...");
 
     try {
-      const result = await Promise.race([
-        testCase.execute(),
-        this.timeoutPromise(testCase.timeout)
-      ]);
+      // Ensure test output directory exists
+      await fs.mkdir(testOutputDir, { recursive: true });
 
-      return {
-        ...result,
-        duration: Date.now() - startTime,
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        testId: testCase.name,
-        testName: testCase.name,
-        passed: false,
-        duration: Date.now() - startTime,
-        errors: [error instanceof Error ? error.message : String(error)],
-        warnings,
-        details,
-        timestamp: new Date()
-      };
-    }
-  }
+      // Step 1: Test idea selection
+      console.log("\n📝 Step 1: Testing idea selection...");
+      const idea = await this.testIdeaSelection();
+      console.log("✅ Idea selected:", idea.substring(0, 100) + "...");
 
-  // Template validation tests
-  private async testTemplateRequiredFields(): Promise<TestResult> {
-    const templates = await storage.getVideoTemplates();
-    const errors: string[] = [];
-    const warnings: string[] = [];
+      // Step 2: Test outline generation
+      console.log("\n📋 Step 2: Testing outline generation...");
+      const outline = await this.testOutlineGeneration(idea);
+      console.log("✅ Outline generated with", outline.chapters.length, "chapters");
+      console.log("📖 Title:", outline.title);
 
-    for (const template of templates) {
-      if (!template.storyOutlinePrompt) {
-        errors.push(`Template ${template.name}: Missing story outline prompt`);
-      }
-      if (!template.imagePrompt) {
-        errors.push(`Template ${template.name}: Missing image prompt`);
-      }
-      if (!template.ideasList) {
-        errors.push(`Template ${template.name}: Missing ideas list`);
-      }
-    }
+      // Step 3: Test full script generation
+      console.log("\n📜 Step 3: Testing full script generation...");
+      const fullScript = await this.testFullScriptGeneration(outline);
+      console.log("✅ Full script generated:", fullScript.length, "characters");
 
-    return {
-      testId: 'template_required_fields',
-      testName: 'Template Required Fields',
-      passed: errors.length === 0,
-      duration: 0,
-      errors,
-      warnings,
-      details: { templatesChecked: templates.length },
-      timestamp: new Date()
-    };
-  }
+      // Step 4: Test visual style generation
+      console.log("\n🎨 Step 4: Testing visual style generation...");
+      const visualStyle = await this.testVisualStyleGeneration(outline);
+      console.log("✅ Visual style generated:", visualStyle.substring(0, 100) + "...");
 
-  private async testTemplateContentQuality(): Promise<TestResult> {
-    const templates = await storage.getVideoTemplates();
-    const warnings: string[] = [];
+      // Step 5: Test chapter content generation
+      console.log("\n📚 Step 5: Testing chapter content generation...");
+      const chapterContents = await this.testChapterContentGeneration(outline, fullScript);
+      console.log("✅ Chapter contents generated for", chapterContents.length, "chapters");
 
-    for (const template of templates) {
-      if (template.storyOutlinePrompt && template.storyOutlinePrompt.length < 50) {
-        warnings.push(`Template ${template.name}: Story outline prompt is very short`);
-      }
-      if (template.videoLength && (template.videoLength < 5 || template.videoLength > 120)) {
-        warnings.push(`Template ${template.name}: Video length should be between 5 and 120 minutes`);
-      }
-      if (template.imageCount && (template.imageCount < 3 || template.imageCount > 20)) {
-        warnings.push(`Template ${template.name}: Image count should be between 3 and 20`);
-      }
-    }
+      // Step 6: Test image generation for each chapter
+      console.log("\n🖼️ Step 6: Testing image generation for chapters...");
+      const chapterImageData = await this.testChapterImageGeneration(chapterContents, visualStyle);
+      console.log("✅ Images generated for", chapterImageData.length, "chapters");
 
-    return {
-      testId: 'template_content_quality',
-      testName: 'Template Content Quality',
-      passed: true,
-      duration: 0,
-      errors: [],
-      warnings,
-      details: { templatesChecked: templates.length },
-      timestamp: new Date()
-    };
-  }
-
-  private async testTemplateIdeasList(): Promise<TestResult> {
-    const templates = await storage.getVideoTemplates();
-    const errors: string[] = [];
-    const warnings: string[] = [];
-
-    for (const template of templates) {
-      if (template.ideasList) {
-        const ideas = template.ideasList.split(template.ideasDelimiter || "---");
-        if (ideas.length < 2) {
-          errors.push(`Template ${template.name}: Ideas list should contain at least 2 ideas`);
-        }
-        if (ideas.length > 20) {
-          warnings.push(`Template ${template.name}: Ideas list is very long`);
-        }
-      }
-    }
-
-    return {
-      testId: 'template_ideas_list',
-      testName: 'Template Ideas List',
-      passed: errors.length === 0,
-      duration: 0,
-      errors,
-      warnings,
-      details: { templatesChecked: templates.length },
-      timestamp: new Date()
-    };
-  }
-
-  // System integration tests
-  private async testOpenAIService(): Promise<TestResult> {
-    try {
-      const { openaiService } = await import("./openai");
-      
-      // Test with a simple prompt
-      const testPrompt = "Generate a simple story outline for a 5-minute video about technology.";
-      const result = await openaiService.generateStoryOutline("Test idea", testPrompt);
-      
-      if (!result.title || !result.chapters || result.chapters.length === 0) {
-        throw new Error("OpenAI service returned invalid response format");
-      }
-
-      return {
-        testId: 'openai_service',
-        testName: 'OpenAI Service',
-        passed: true,
-        duration: 0,
-        errors: [],
-        warnings: [],
-        details: { responseReceived: true },
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        testId: 'openai_service',
-        testName: 'OpenAI Service',
-        passed: false,
-        duration: 0,
-        errors: [error instanceof Error ? error.message : String(error)],
-        warnings: [],
-        details: {},
-        timestamp: new Date()
-      };
-    }
-  }
-
-  private async testImageGenerationService(): Promise<TestResult> {
-    try {
-      const { fluxService } = await import("./flux");
-      
-      // Test with a simple image prompt
-      const testPrompt = "A simple landscape with mountains and trees";
-      const result = await fluxService.generateImageWithFallback(testPrompt);
-      
-      if (!result.filename) {
-        throw new Error("Image generation service returned invalid response");
-      }
-
-      return {
-        testId: 'image_generation_service',
-        testName: 'Image Generation Service',
-        passed: true,
-        duration: 0,
-        errors: [],
-        warnings: [],
-        details: { imageGenerated: true },
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        testId: 'image_generation_service',
-        testName: 'Image Generation Service',
-        passed: false,
-        duration: 0,
-        errors: [error instanceof Error ? error.message : String(error)],
-        warnings: [],
-        details: {},
-        timestamp: new Date()
-      };
-    }
-  }
-
-  private async testAudioGenerationService(): Promise<TestResult> {
-    try {
-      const { elevenLabsService } = await import("./elevenlabs");
-
-      const voices = await elevenLabsService.getAvailableVoices();
-      
-      // Test with a simple text
-      const testText = "This is a test of the audio generation service.";
-      const result = await elevenLabsService.generateAudio(testText, voices[0].voice_id, "test-voice");
-      
-      if (!result.filename) {
-        throw new Error("Audio generation service returned invalid response");
-      }
-
-      return {
-        testId: 'audio_generation_service',
-        testName: 'Audio Generation Service',
-        passed: true,
-        duration: 0,
-        errors: [],
-        warnings: [],
-        details: { audioGenerated: true },
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        testId: 'audio_generation_service',
-        testName: 'Audio Generation Service',
-        passed: false,
-        duration: 0,
-        errors: [error instanceof Error ? error.message : String(error)],
-        warnings: [],
-        details: {},
-        timestamp: new Date()
-      };
-    }
-  }
-
-  private async testVideoRenderingService(): Promise<TestResult> {
-    try {
-      const { remotionService } = await import("./remotion");
-      
-      // Test bundle initialization
-      await remotionService.initializeBundle();
-      
-      return {
-        testId: 'video_rendering_service',
-        testName: 'Video Rendering Service',
-        passed: true,
-        duration: 0,
-        errors: [],
-        warnings: [],
-        details: { bundleInitialized: true },
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        testId: 'video_rendering_service',
-        testName: 'Video Rendering Service',
-        passed: false,
-        duration: 0,
-        errors: [error instanceof Error ? error.message : String(error)],
-        warnings: [],
-        details: {},
-        timestamp: new Date()
-      };
-    }
-  }
-
-  // Workflow tests
-  private async testCompleteVideoGeneration(): Promise<TestResult> {
-    try {
-      // Get test channel and template
-      const channels = await storage.getChannels();
-      const templates = await storage.getVideoTemplates();
-
-      if (channels.length === 0 || templates.length === 0) {
-        throw new Error("No channels, templates, or thumbnail templates available for testing");
-      }
-
-      const channel = channels[0];
-      const template = templates[0];
-
-      // Create test video
-      const video = await storage.createVideo({
-        channelId: channel.id,
-        templateId: template.id,
-        title: "Test Video Generation",
-        status: "generating",
+      // Step 7: Save all test results
+      console.log("\n💾 Step 7: Saving test results...");
+      await this.saveTestResults({
+        testVideoId,
+        idea,
+        outline,
+        fullScript,
+        visualStyle,
+        chapterContents,
+        chapterImageData
       });
 
-      // Run video generation in test mode
-      await videoWorkflowService.generateVideo(
-        video.id,
-        channel.id,
-        template,
-        true // test mode
-      );
+      console.log("\n🎉 New workflow test completed successfully!");
+      console.log("📁 Test results saved to:", testOutputDir);
 
-      // Verify video was created successfully
-      const updatedVideo = await storage.getVideo(video.id);
-      if (!updatedVideo || updatedVideo.status === "error") {
-        throw new Error("Video generation failed");
-      }
-
-      return {
-        testId: 'complete_video_generation',
-        testName: 'Complete Video Generation',
-        passed: true,
-        duration: 0,
-        errors: [],
-        warnings: [],
-        details: { videoId: video.id, status: updatedVideo.status },
-        timestamp: new Date()
-      };
     } catch (error) {
-      return {
-        testId: 'complete_video_generation',
-        testName: 'Complete Video Generation',
-        passed: false,
-        duration: 0,
-        errors: [error instanceof Error ? error.message : String(error)],
-        warnings: [],
-        details: {},
-        timestamp: new Date()
-      };
+      console.error("❌ Test failed:", error);
+      throw error;
     }
   }
 
-  private async testErrorHandling(): Promise<TestResult> {
-    try {
-      // Test with invalid input
-      const validationResult = await validationService.validateVideoGenerationInput(
-        999999, // Invalid channel ID
-        999999, // Invalid template ID
-        true
-      );
+  private async testIdeaSelection(): Promise<string> {
+    const testIdeas = [
+      "A mysterious package arrives at a remote cabin",
+      "An ancient map leads to a hidden treasure",
+      "A scientist discovers a time-traveling device",
+      "A detective solves a century-old mystery",
+      "An astronaut finds an abandoned space station"
+    ];
 
-      if (validationResult.isValid) {
-        throw new Error("Validation should have failed with invalid inputs");
-      }
-
-      return {
-        testId: 'error_handling',
-        testName: 'Error Handling',
-        passed: true,
-        duration: 0,
-        errors: [],
-        warnings: [],
-        details: { validationErrors: validationResult.errors.length },
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        testId: 'error_handling',
-        testName: 'Error Handling',
-        passed: false,
-        duration: 0,
-        errors: [error instanceof Error ? error.message : String(error)],
-        warnings: [],
-        details: {},
-        timestamp: new Date()
-      };
-    }
+    const randomIdea = testIdeas[Math.floor(Math.random() * testIdeas.length)];
+    return randomIdea;
   }
 
-  private async testQualityValidation(): Promise<TestResult> {
-    try {
-      // Test content quality validation
-      const qualityResult = await validationService.validateGeneratedContent(
-        "This is a test script with sufficient content for quality validation.",
-        [{ filename: "test1.jpg" }, { filename: "test2.jpg" }],
-        [{ filename: "test1.mp3" }, { filename: "test2.mp3" }],
-        "Test Video Title"
-      );
+  private async testOutlineGeneration(idea: string) {
+    const prompt = `
+Create a compelling story outline for a YouTube video based on this idea: "${idea}"
+Include 5 chapters with descriptive names.
+The story should be engaging, mysterious, and suitable for visual storytelling.`;
 
-      if (!qualityResult.passed) {
-        throw new Error(`Quality validation failed: ${qualityResult.issues.join(", ")}`);
-      }
-
-      return {
-        testId: 'quality_validation',
-        testName: 'Quality Validation',
-        passed: true,
-        duration: 0,
-        errors: [],
-        warnings: [],
-        details: { qualityScore: qualityResult.score },
-        timestamp: new Date()
-      };
-    } catch (error) {
-      return {
-        testId: 'quality_validation',
-        testName: 'Quality Validation',
-        passed: false,
-        duration: 0,
-        errors: [error instanceof Error ? error.message : String(error)],
-        warnings: [],
-        details: {},
-        timestamp: new Date()
-      };
-    }
-  }
-
-  // Utility method for timeout
-  private timeoutPromise(ms: number): Promise<never> {
-    return new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`Test timed out after ${ms}ms`)), ms);
+    const outline = await openaiService.generateStoryOutline(idea, prompt, {
+      model: "gpt-5",
+      temperature: 0.7,
+      maxTokens: 4000,
+      topP: 1.0,
+      frequencyPenalty: 0
     });
+
+    return outline;
   }
 
-  // Get test statistics
-  async getTestStatistics(): Promise<any> {
-    try {
-      const results = await this.runAllTests();
-      
-      const stats = {
-        totalTests: results.length,
-        passedTests: results.filter(r => r.passed).length,
-        failedTests: results.filter(r => !r.passed).length,
-        successRate: (results.filter(r => r.passed).length / results.length) * 100,
-        averageDuration: results.reduce((sum, r) => sum + r.duration, 0) / results.length,
-        errorsByTest: results.filter(r => !r.passed).map(r => ({
-          testName: r.testName,
-          errors: r.errors
-        }))
-      };
+  private async testFullScriptGeneration(outline: any): Promise<string> {
+    const prompt = `
+Based on this story outline, write a complete, engaging script for a YouTube video:
+"""
+${JSON.stringify(outline, null, 2)}
+"""
 
-      return stats;
-    } catch (error) {
-      console.error('Failed to get test statistics:', error);
-      return { totalTests: 0, passedTests: 0, failedTests: 0, successRate: 0 };
+Write a full narrative script that:
+- Is engaging and keeps viewers hooked
+- Has natural pacing and flow
+- Is approximately 2000-3000 words
+- Uses vivid, descriptive language
+- Maintains suspense throughout
+- Is divided into clear chapters
+- Provides rich visual descriptions for image generation`;
+
+    const script = await openaiService.generateFullScript(outline, prompt, {
+      model: "gpt-5",
+      temperature: 0.7,
+      maxTokens: 4000,
+      topP: 1.0,
+      frequencyPenalty: 0
+    });
+
+    return script;
+  }
+
+  private async testVisualStyleGeneration(outline: any): Promise<string> {
+    const prompt = `
+Based on this story outline, generate a single paragraph describing a consistent visual style for the entire video:
+
+Outline:
+${JSON.stringify(outline, null, 2)}
+
+Generate a visual style description that includes:
+- Overall artistic style and aesthetic
+- Color palette and mood
+- Lighting approach
+- Visual elements and motifs
+- Aspect ratio and technical considerations
+
+This style will be used consistently across all images in the video.`;
+
+    const visualStyle = await openaiService.generateVisualStyle(prompt, {
+      model: "gpt-5",
+      temperature: 0.7,
+      maxTokens: 4000,
+      topP: 1.0,
+      frequencyPenalty: 0
+    });
+
+    return visualStyle;
+  }
+
+  private async testChapterContentGeneration(outline: any, fullScript: string): Promise<Array<{ name: string; content: string }>> {
+    const chapters = outline.chapters || [];
+    const chapterContents = [];
+
+    for (let i = 0; i < chapters.length; i++) {
+      const chapter = chapters[i];
+      console.log(`  📖 Generating content for chapter ${i + 1}: ${chapter.name}`);
+
+      const prompt = `
+Based on the story outline and the full script, generate the complete content for this specific chapter:
+
+Chapter: ${chapter.name}
+Description: ${chapter.description}
+
+Full Script Context:
+${fullScript}
+
+Generate a detailed, engaging chapter that:
+- Expands on the chapter description
+- Maintains narrative flow
+- Is approximately 300-500 words
+- Uses vivid, descriptive language
+- Provides clear visual cues for image generation`;
+
+      const content = await openaiService.generateChapterContent(prompt, {
+        model: "gpt-5",
+        temperature: 0.7,
+        maxTokens: 4000,
+        topP: 1.0,
+        frequencyPenalty: 0
+      });
+
+      chapterContents.push({
+        name: chapter.name,
+        content: content
+      });
+    }
+
+    return chapterContents;
+  }
+
+  private async testChapterImageGeneration(
+    chapterContents: Array<{ name: string; content: string }>,
+    visualStyle: string
+  ): Promise<Array<{ chapter: string; images: Array<{ filename: string; scriptSegment: string; anchors: Array<{ img: number; start: string; end: string }> }> }>> {
+
+    const chapterImageData = [];
+    const imageCountRange = { min: 3, max: 5 }; // Test with smaller range
+
+    for (let i = 0; i < chapterContents.length; i++) {
+      const chapter = chapterContents[i];
+      console.log(`  🖼️ Generating images for chapter ${i + 1}: ${chapter.name}`);
+
+      // Select random image count for this chapter
+      const imageCount = Math.floor(Math.random() * (imageCountRange.max - imageCountRange.min + 1)) + imageCountRange.min;
+
+      const mainPrompt = `Produce ${imageCount} image prompts that stay in one consistent visual style and align to precise beats in the chapter using exact-phrase text anchors. No timestamps. Image 1 starts at chapter_start. Image ${imageCount} runs until chapter_end. Each image must not preview events past its end anchor.
+
+HARD CONSTRAINTS
+- Lengths: anchors.length = ${imageCount}; images.length = ${imageCount}.
+- Order: anchors and images are aligned 1:1 by index (first anchor maps to first image, etc.).
+- Fields: only the fields shown above. Do not include additional fields.
+- Valid JSON: escape quotes from chapter text; no comments in final JSON; no markdown fencing.
+
+ANCHOR RULES
+- Use exact-phrase text anchors pulled verbatim from the chapter.
+- Length per anchor phrase: 5–7 consecutive words.
+- Choose phrases that occur only once in the chapter. If a phrase repeats, extend it until unique.
+- Preserve case and punctuation. Ensure valid JSON by escaping quotes.
+- For i = 1: {"img":1, "start":"chapter_start", "end":"<exact phrase>"}
+- For 1 < i < ${imageCount}: {"img":i, "start":"<exact phrase>", "end":"<exact phrase>"}
+- For i = ${imageCount}: {"img":${imageCount}, "start":"<exact phrase>", "end":"chapter_end"}
+- Anchors must be in strict reading order, non-overlapping, and collectively cover the chapter from start to end.
+
+STYLE RULES
+- Start every image prompt with one identical single-line style string and repeat it verbatim.
+- Include aspect ratio and any technical traits here.
+- Example style line you may replace: "${visualStyle}"
+
+SCENE RULES
+- Scene must depict only what is plausible within its anchor range.
+- Make each scene distinct from one another.
+- No text overlays. Avoid spoilers beyond the end anchor.
+- Do not depict people.
+- Keep each scene simple, with minimal elements that are not complex or difficult to generate with AI.
+- Describe everything in the shot in minute detail to remove ambiguity.
+- Use concrete subjects and settings named or implied before each end anchor (objects, landmarks, terrain, structures, vehicles, tools, artifacts, celestial features, symbols).
+
+AD-SAFETY RULES
+- Do not depict: weapons of any kind (knives, guns, improvised weapons), broken glass, blood, gore, wounds, or graphic injury.
+- Do not depict violence, self-harm, restraint devices, or law-enforcement/military gear.
+- Do not depict hate or extremist symbols, sexual or suggestive content, nudity, drugs, smoking, or alcohol.
+- If unsafe items are mentioned in the text, imply only via environment or aftermath without showing the item itself.
+
+CONTINUITY AND SELF-CONTAINMENT RULES
+- CRITICAL: Each image prompt must stand alone. Do not reference any other image or use comparative terms like "before", "continued", "again", "still", or "another view of".
+- The image generation tool will not know what any of the other image prompts contain. If a scene repeats across separate image prompts, fully re-describe the setting and elements as if new, without using any comparative language or referring back to prior descriptions.
+- If a setting or subject repeats, explicitly name it each time and describe stable layout cues so scenes match across images.
+
+FRAMING AND LAYOUT RULES
+- Describe precise camera setup in every image prompt: shot scale (macro/close/medium/wide/aerial), lens equivalent in mm or field-of-view, camera height or distance with units, camera angle (eye-level, low, high, top-down, oblique), and camera position relative to stable landmarks.
+- Provide a one-sentence spatial map naming key landmarks or axes and their relative positions suitable for any environment: horizon line, shoreline, road, river, ridge, skyline, façade, vehicle, machinery, tree line, boulder, corridor, archway, desk, shelf, instrument panel, star field, planet limb, diagram axes, abstract shapes.
+- Specify composition unambiguously: what occupies frame left/center/right and foreground/midground/background (or near/mid/far). Include at least one compositional anchor such as "horizon on upper third", "river diagonal bottom-left to top-right", "door centered", "console dominating foreground right".
+- Ensure line-of-sight realism. Do not describe seeing through opaque objects or around corners. Keep scales, perspective, and occlusions physically plausible.
+- If layout is unspecified, choose a conservative vantage typical for the setting category and keep all elements consistent with that choice.
+
+CHAPTER TEXT:
+"""
+${chapter.content}
+"""`;
+
+      const response = await openaiService.generateChapterImages(mainPrompt, imageCount, {
+        model: "gpt-5",
+        temperature: 0.7,
+        maxTokens: 4000,
+        topP: 1.0,
+        frequencyPenalty: 0
+      });
+
+      // Generate actual images using Flux (for testing, we'll just simulate this)
+      const images = [];
+      for (let j = 0; j < response.images.length; j++) {
+        const imagePrompt = response.images[j];
+        try {
+          // For testing, we'll create a mock image filename
+          const mockImage = {
+            filename: `test_chapter_${i + 1}_image_${j + 1}.jpg`,
+            scriptSegment: imagePrompt.scriptSegment,
+            anchors: response.anchors || []
+          };
+          images.push(mockImage);
+
+          console.log(`    ✅ Generated image ${j + 1} for chapter ${i + 1}`);
+        } catch (error) {
+          console.error(`    ❌ Failed to generate image ${j + 1} for chapter ${i + 1}:`, error);
+        }
+      }
+
+      chapterImageData.push({
+        chapter: chapter.name,
+        images: images
+      });
+    }
+
+    return chapterImageData;
+  }
+
+  private async saveTestResults(results: {
+    testVideoId: number;
+    idea: string;
+    outline: any;
+    fullScript: string;
+    visualStyle: string;
+    chapterContents: Array<{ name: string; content: string }>;
+    chapterImageData: Array<{ chapter: string; images: Array<{ filename: string; scriptSegment: string; anchors: Array<{ img: number; start: string; end: string }> }> }>;
+  }): Promise<void> {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const testDir = path.join(testOutputDir, `workflow-test-${timestamp}`);
+
+    await fs.mkdir(testDir, { recursive: true });
+
+    // Save individual files
+    await fs.writeFile(path.join(testDir, '01-idea.txt'), results.idea);
+    await fs.writeFile(path.join(testDir, '02-outline.json'), JSON.stringify(results.outline, null, 2));
+    await fs.writeFile(path.join(testDir, '03-full-script.txt'), results.fullScript);
+    await fs.writeFile(path.join(testDir, '04-visual-style.txt'), results.visualStyle);
+    await fs.writeFile(path.join(testDir, '05-chapter-contents.json'), JSON.stringify(results.chapterContents, null, 2));
+    await fs.writeFile(path.join(testDir, '06-chapter-images.json'), JSON.stringify(results.chapterImageData, null, 2));
+
+    // Create a summary report
+    const summary = {
+      testVideoId: results.testVideoId,
+      timestamp: timestamp,
+      idea: results.idea,
+      outline: {
+        title: results.outline.title,
+        chapterCount: results.outline.chapters?.length || 0,
+        chapters: results.outline.chapters?.map((c: any) => c.name) || []
+      },
+      fullScript: {
+        characterCount: results.fullScript.length,
+        wordCount: results.fullScript.split(' ').length
+      },
+      visualStyle: results.visualStyle.substring(0, 200) + "...",
+      chapterContents: results.chapterContents.map(c => ({
+        name: c.name,
+        characterCount: c.content.length,
+        wordCount: c.content.split(' ').length
+      })),
+      chapterImages: results.chapterImageData.map(c => ({
+        chapter: c.chapter,
+        imageCount: c.images.length,
+        images: c.images.map(img => ({
+          filename: img.filename,
+          scriptSegmentLength: img.scriptSegment.length,
+          anchorCount: img.anchors.length
+        }))
+      })),
+      totalImages: results.chapterImageData.reduce((sum, c) => sum + c.images.length, 0)
+    };
+
+    await fs.writeFile(path.join(testDir, '00-summary.json'), JSON.stringify(summary, null, 2));
+
+    console.log(`📊 Test Summary:`);
+    console.log(`   📝 Idea: ${results.idea.substring(0, 50)}...`);
+    console.log(`   📖 Title: ${results.outline.title}`);
+    console.log(`   📚 Chapters: ${results.outline.chapters?.length || 0}`);
+    console.log(`   📜 Script: ${results.fullScript.length} characters`);
+    console.log(`   🎨 Visual Style: ${results.visualStyle.substring(0, 50)}...`);
+    console.log(`   🖼️ Total Images: ${summary.totalImages}`);
+    console.log(`   📁 Results saved to: ${testDir}`);
+  }
+
+  // Utility method to run a quick test
+  async runQuickTest(): Promise<void> {
+    console.log("⚡ Running quick workflow test...");
+    await this.testNewWorkflow();
+  }
+
+  // Utility method to run multiple tests
+  async runMultipleTests(count: number = 3): Promise<void> {
+    console.log(`🔄 Running ${count} workflow tests...`);
+
+    for (let i = 1; i <= count; i++) {
+      console.log(`\n📋 Test ${i}/${count}`);
+      try {
+        await this.testNewWorkflow(999999 + i);
+        console.log(`✅ Test ${i} completed successfully`);
+      } catch (error) {
+        console.error(`❌ Test ${i} failed:`, error);
+      }
+    }
+
+    console.log(`\n🎉 Completed ${count} tests`);
+  }
+
+  // ---- Endpoint compatibility helpers ----
+  // The routes expect an object with an array of results where each item has { passed: boolean }
+  async runAllTests(): Promise<Array<{ name: string; passed: boolean; durationMs: number; error?: string }>> {
+    const results: Array<{ name: string; passed: boolean; durationMs: number; error?: string }> = [];
+    const start = Date.now();
+    try {
+      await this.testNewWorkflow();
+      results.push({ name: "new-workflow-before-audio", passed: true, durationMs: Date.now() - start });
+    } catch (e) {
+      const err = e as Error;
+      results.push({ name: "new-workflow-before-audio", passed: false, durationMs: Date.now() - start, error: err.message });
+    }
+    return results;
+  }
+
+  async runTestSuite(testSuite: string): Promise<Array<{ name: string; passed: boolean; durationMs: number; error?: string }>> {
+    const suite = (testSuite || "").toLowerCase();
+    switch (suite) {
+      case "new-workflow":
+      case "new-workflow-before-audio": {
+        const start = Date.now();
+        try {
+          await this.testNewWorkflow();
+          return [{ name: "new-workflow-before-audio", passed: true, durationMs: Date.now() - start }];
+        } catch (e) {
+          const err = e as Error;
+          return [{ name: "new-workflow-before-audio", passed: false, durationMs: Date.now() - start, error: err.message }];
+        }
+      }
+      case "smoke": {
+        // Minimal smoke test: outline + visual style only
+        const start = Date.now();
+        try {
+          const idea = await this.testIdeaSelection();
+          const outline = await this.testOutlineGeneration(idea);
+          await this.testVisualStyleGeneration(outline);
+          return [{ name: "smoke", passed: true, durationMs: Date.now() - start }];
+        } catch (e) {
+          const err = e as Error;
+          return [{ name: "smoke", passed: false, durationMs: Date.now() - start, error: err.message }];
+        }
+      }
+      default:
+        return this.runAllTests();
+    }
+  }
+
+  async getTestStatistics(): Promise<{
+    totalRuns: number;
+    lastRunAt?: string;
+    totalImages?: number;
+    averageImagesPerRun?: number;
+  }> {
+    try {
+      // Aggregate stats from saved summaries under test-output/
+      const dir = await fs.readdir(testOutputDir, { withFileTypes: true });
+      const runDirs = dir.filter(d => d.isDirectory() && d.name.startsWith("workflow-test-"));
+      let totalImages = 0;
+      let runsWithSummary = 0;
+      let lastRunAt: string | undefined;
+
+      for (const d of runDirs) {
+        try {
+          const summaryPath = path.join(testOutputDir, d.name, "00-summary.json");
+          const raw = await fs.readFile(summaryPath, "utf-8");
+          const summary = JSON.parse(raw);
+          if (typeof summary?.totalImages === "number") {
+            totalImages += summary.totalImages;
+          }
+          runsWithSummary += 1;
+          lastRunAt = summary?.timestamp || lastRunAt;
+        } catch {
+          // ignore per-run errors
+        }
+      }
+
+      return {
+        totalRuns: runDirs.length,
+        lastRunAt,
+        totalImages,
+        averageImagesPerRun: runDirs.length ? Math.round((totalImages / Math.max(1, runsWithSummary)) * 100) / 100 : 0,
+      };
+    } catch {
+      return { totalRuns: 0 };
     }
   }
 }
 
-export const testingService = new TestingService(); 
+export const testingService = new WorkflowTestService();

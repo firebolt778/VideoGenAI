@@ -16,25 +16,30 @@ import type { Channel, VideoTemplate } from "@shared/schema";
 
 const stages = [
   "initialization",
+  "validation",
   "idea_selection",
   "outline",
   "script",
+  "visual_style",
   "hook",
+  "chapter_processing",
   "images",
-  "image_assignment",
   "audio",
   "rendering",
 ];
+
 const stageLabels: Record<string, string> = {
   "initialization": "Initialize",
-  "idea_selection": "Selected Idea",
-  "outline": "Created Outline",
-  "script": "Writed Full Script",
-  "hook": "Generated Hook",
-  "images": "Created Images",
-  "image_assignment": "Assigned Images",
-  "audio": "Generated Audio",
-  "rendering": "Rendered Video",
+  "validation": "Validation",
+  "idea_selection": "Selecting Idea",
+  "outline": "Creating Outline",
+  "script": "Writing Full Script",
+  "visual_style": "Generating Visual Style",
+  "hook": "Generating Hook",
+  "chapter_processing": "Processing Chapters",
+  "images": "Generating Images",
+  "audio": "Generating Audio",
+  "rendering": "Rendering Video",
 };
 
 interface VideoTestPanelProps {
@@ -207,7 +212,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
             <Progress value={testProgress?.progress || 0} className="h-2" />
             <div className="space-y-2 bg-gray-800 text-white rounded-lg p-4">
               {Object.keys(stageLabels).map((stage, curIndex) => {
-                const index = stages.indexOf(testProgress?.stage || "");
+                const index = stages.indexOf(testProgress?.stage || "") + 1;
                 return (
                   <div key={stage} className="flex items-center gap-2">
                     {getStageIcon(curIndex, index)}

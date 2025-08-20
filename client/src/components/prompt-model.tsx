@@ -39,91 +39,95 @@ export default function PromptModelSelector({ form, name, title, className }: Pr
           )}
         />
 
-        <FormField
-          control={form.control}
-          name={`${name}.maxTokens`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Max Tokens</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="e.g. 500"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {!form.watch(`${name}.model`).startsWith("gpt-5") && (
+          <FormField
+            control={form.control}
+            name={`${name}.maxTokens`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Max Tokens</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="e.g. 500"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
-        <FormField
-          control={form.control}
-          name={`${name}.temperature`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Temperature</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  placeholder="0.7"
-                  disabled={form.watch(`${name}.model`) === "gpt-5"}
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      {!form.watch(`${name}.model`).startsWith("gpt-5") && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
+          <FormField
+            control={form.control}
+            name={`${name}.temperature`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Temperature</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    placeholder="0.7"
+                    disabled={form.watch(`${name}.model`) === "gpt-5"}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name={`${name}.topP`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Top P</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  placeholder="0.9"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <FormField
+            control={form.control}
+            name={`${name}.topP`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Top P</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    placeholder="0.9"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <FormField
-          control={form.control}
-          name={`${name}.frequencyPenalty`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Frequency Penalty</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  placeholder="0.0"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
+          <FormField
+            control={form.control}
+            name={`${name}.frequencyPenalty`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Frequency Penalty</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    placeholder="0.0"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      )}
     </div>
   )
 }

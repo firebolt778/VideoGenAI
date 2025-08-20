@@ -196,212 +196,6 @@ ${outline}
     }
   }
 
-  async assignImagesToScript(script: string, images: any[], customPrompt?: string, options?: PromptModel): Promise<ImageAssignment[]> {
-    const imgDescriptions = images.map(img => ({
-      filename: img.filename,
-      description: img.description || "No description available"
-    }));
-    let prompt = customPrompt || `
-You are assigning pre-generated images to sections of a narrative script.
-Instructions:
-1. You have a list of ${images.length} images, each with a unique filename and a brief description of its visual content.
-2. You also have a script. Your task is to split the script and select and arrange the appropriate images for it.
-3. You MUST NOT assign or create image filenames that are not in the list of images given. They are the only images available to assign. If there is no image matching the segment in the given array, append it with the previous segment.
-4. Don't skip any segment of the script.
-5. Stay strictly within chapter boundaries (Each chapter is separated by +++). Do **not** assign script segments across chapters.
-
-Full Script:
-"""
-${script}
-"""
-
-Available images:
-"""
-${JSON.stringify(imgDescriptions, undefined, 2)}
-"""
-`;
-    prompt += `
-Requirements:
-- Include **every chapter** (including prologue and epilogue), with **at least one image per chapter**.
-- **Include all images and scripts in the response**.
-- Reuse an image **only** when the same setting or atmosphere is clearly revisited (e.g., same location, repeated dream, returning to cabin, etc.).
-- If the segment does not match the image, add it to the previous image.
-
-Respond with JSON in this exact format:
-{
-  "assignments": [
-    {
-      "chapter": "Chapter 1. Exact title from the script",
-      "images": [
-        {
-          "filename": "Exact filename from the images list",
-          "scriptSegment": "Texts from script this image should accompany",
-        },
-        {
-          "filename": "Exact filename from the images list",
-          "scriptSegment": "Texts from script this image should accompany",
-        },
-        ...
-      ]
-    }
-  ]
-}`;
-
-    try {
-      let additionalParams: { [key: string]: any } = {};
-      if (options?.model !== "gpt-5") {
-        additionalParams = {
-          temperature: options?.temperature ?? 0.7,
-          frequency_penalty: options?.frequencyPenalty ?? 0,
-          max_completion_tokens: options?.maxTokens || 4000,
-          top_p: options?.topP || 1.0
-        }
-      }
-      const response1 = await openai.chat.completions.create({
-        model: options?.model || "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert video editor who understands visual storytelling and pacing."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        response_format: { type: "json_object" },
-        ...additionalParams
-      });
-
-      const result1 = JSON.parse(response1.choices[0].message.content || "{}");
-      const assignments = result1.assignments || [];
-      const processPrompt = `
-Review this assignmets and update them if necessary. Ensure that:
-- If any part of script is missed in the assignment, add it to the correct position.
-- If the filename is the same as the previous image (only in same chapter), append the script segment to the previous image.
-- If any image file is missed in the assignment, add it to the correct position.
-
-Full Script:
-"""
-${script}
-"""
-
-Assignments:
-"""
-${JSON.stringify(assignments, null, 2)}
-"""
-
-Available images:
-"""
-${JSON.stringify(imgDescriptions, null, 2)}
-"""
-
-Respond with JSON in this exact format:
-{
-  "assignments": [
-    {
-      "chapter": "Chapter 1. Exact title from the assignment",
-      "images": [
-        {
-          "filename": "Exact filename from the assignment list",
-          "scriptSegment": "...",
-        },
-        {
-          "filename": "Exact filename from the assignment list",
-          "scriptSegment": "...",
-        },
-        ...
-      ]
-    }
-  ]
-}`;
-
-      const response2 = await openai.chat.completions.create({
-        model: "gpt-5",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert video editor who understands visual storytelling and pacing."
-          },
-          {
-            role: "user",
-            content: processPrompt
-          }
-        ],
-        response_format: { type: "json_object" },
-      });
-
-      const result2 = JSON.parse(response2.choices[0].message.content || "{}");
-      return result2.assignments || [];
-    } catch (error) {
-      throw new Error(`Failed to assign images to script: ${(error as Error).message}`);
-    }
-  }
-
-  async generateImagePrompts(script: string, numImages: number, customPrompt?: string, context?: { mainCharacter?: string, environment?: string }, options?: PromptModel): Promise<ImagePrompt[]> {
-    let prompt = customPrompt || `
-Analyze this script and generate ${numImages} detailed image prompts that would visually represent key scenes:
-
-Script:
-\`\`\`
-${script}
-\`\`\``;
-    prompt += `
-
-For each image, create a detailed description that includes:
-- Main subject/scene
-- Artistic style (cinematic, dramatic, ethereal, etc.)
-- Mood and atmosphere
-- Lighting and color palette`;
-    // --- Add character/environment consistency ---
-    if (context?.mainCharacter && context?.environment) {
-      prompt += `\n\nIMPORTANT: Every image must feature the same main character: ${context.mainCharacter}, and the same environment: ${context.environment}.`;
-    }
-    prompt += `
-Respond with JSON in this exact format:
-{
-  "images": [
-    {
-      "description": "Detailed scene description",
-      "style": "Art style",
-      "mood": "Mood description"
-    }
-  ]
-}`;
-
-    try {
-      let additionalParams: { [key: string]: any } = {};
-      if (options?.model !== "gpt-5") {
-        additionalParams = {
-          temperature: options?.temperature ?? 0.7,
-          frequency_penalty: options?.frequencyPenalty ?? 0,
-          max_completion_tokens: options?.maxTokens || 4000,
-          top_p: options?.topP || 1.0
-        }
-      }
-      const response = await openai.chat.completions.create({
-        model: options?.model || "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert visual director who creates detailed image prompts for AI art generation. Always respond with valid JSON."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        response_format: { type: "json_object" },
-        ...additionalParams
-      });
-
-      const result = JSON.parse(response.choices[0].message.content || "{}");
-      return result.images || result.prompts || result.image_prompts || [];
-    } catch (error) {
-      throw new Error(`Failed to generate image prompts: ${(error as Error).message}`);
-    }
-  }
-
   async generateVideoDescription(title: string, script: string, channelInfo?: any, customPrompt?: string, options?: PromptModel): Promise<string> {
     const prompt = customPrompt || `
 Create an engaging YouTube video description for this video:
@@ -447,6 +241,128 @@ Keep it under 1000 characters.`;
       return response.choices[0].message.content || "";
     } catch (error) {
       throw new Error(`Failed to generate video description: ${(error as Error).message}`);
+    }
+  }
+
+  async generateVisualStyle(prompt: string, options?: PromptModel): Promise<string> {
+    try {
+      let additionalParams: { [key: string]: any } = {};
+      if (options?.model !== "gpt-5") {
+        additionalParams = {
+          temperature: options?.temperature ?? 0.7,
+          frequency_penalty: options?.frequencyPenalty ?? 0,
+          max_completion_tokens: options?.maxTokens || 4000,
+          top_p: options?.topP || 1.0
+        }
+      }
+      const response = await openai.chat.completions.create({
+        model: options?.model || "gpt-5",
+        messages: [
+          {
+            role: "system",
+            content: "You are a visual director who creates consistent visual styles for video content."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        ...additionalParams
+      });
+
+      return response.choices[0].message.content || "";
+    } catch (error) {
+      throw new Error(`Failed to generate visual style: ${(error as Error).message}`);
+    }
+  }
+
+  async generateChapterContent(prompt: string, options?: PromptModel): Promise<string> {
+    try {
+      let additionalParams: { [key: string]: any } = {};
+      if (options?.model !== "gpt-5") {
+        additionalParams = {
+          temperature: options?.temperature ?? 0.7,
+          frequency_penalty: options?.frequencyPenalty ?? 0,
+          max_completion_tokens: options?.maxTokens || 4000,
+          top_p: options?.topP || 1.0
+        }
+      }
+      const response = await openai.chat.completions.create({
+        model: options?.model || "gpt-5",
+        messages: [
+          {
+            role: "system",
+            content: "You are a creative writer who expands story outlines into engaging chapter content."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        ...additionalParams
+      });
+
+      return response.choices[0].message.content || "";
+    } catch (error) {
+      throw new Error(`Failed to generate chapter content: ${(error as Error).message}`);
+    }
+  }
+
+  async generateChapterImages(mainPrompt: string, imageCount: number, options?: PromptModel): Promise<{
+    images: Array<{ description: string; scriptSegment: string }>;
+    anchors: Array<{ img: number; start: string; end: string }>;
+  }> {
+    try {
+      let additionalParams: { [key: string]: any } = {};
+      if (options?.model !== "gpt-5") {
+        additionalParams = {
+          temperature: options?.temperature ?? 0.7,
+          frequency_penalty: options?.frequencyPenalty ?? 0,
+          max_completion_tokens: options?.maxTokens || 4000,
+          top_p: options?.topP || 1.0
+        }
+      }
+      const prompt = `${mainPrompt}
+
+RESPOND WITH JSON ONLY. EXACT FORMAT (no markdown, no comments, no trailing commas):
+{
+  "anchors": [
+    {"img":1, "start":"chapter_start", "end":"<exact phrase>"},
+    {"img":2, "start":"<exact phrase>", "end":"<exact phrase>"},
+    // ... continue sequentially for each i = 3…${imageCount - 1}
+    {"img":${imageCount}, "start":"<exact phrase>", "end":"chapter_end"}
+  ],
+  "images": [
+    {
+      "description": "<STYLE LINE REPEATED VERBATIM>\n<CAMERA: shot scale, lens mm/FOV, camera height or distance with units, angle, exact position relative to stable landmarks>\n<LAYOUT: one-sentence spatial map naming landmarks/axes and their relative positions suited to this environment>\n<COMPOSITION: what is at frame left/center/right and foreground/midground/background, with at least one compositional anchor>\n<fully self-contained scene description that fits only between the start and end anchors for image 1, restating setting and fixed details, with no comparative terms across images>",
+      "scriptSegment": "<verbatim chapter substring from the start anchor phrase through the end anchor phrase, inclusive>"
+    }
+    // ... one object per image in reading order (total ${imageCount})
+  ]
+}`
+      const response = await openai.chat.completions.create({
+        model: options?.model || "gpt-5",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert visual director who creates detailed image prompts with precise text anchors for AI art generation."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        ...additionalParams
+      });
+
+      const result = JSON.parse(response.choices[0].message.content || "{}");
+      return {
+        images: result.images || [],
+        anchors: result.anchors || []
+      };
+    } catch (error) {
+      throw new Error(`Failed to generate chapter images: ${(error as Error).message}`);
     }
   }
 

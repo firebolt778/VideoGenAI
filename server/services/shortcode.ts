@@ -14,13 +14,13 @@ export interface ShortcodeContext {
   channelName?: string;
   channelDescription?: string;
   imageCount?: number;
-  // --- Added for character/environment consistency ---
-  mainCharacter?: string;
-  environment?: string;
+  // --- Added for new workflow ---
+  visualStyle?: string;
+  videoId?: number;
 }
 
 export class ShortcodeProcessor {
-  static process(template: string, context: ShortcodeContext): string {
+  static process(template: string, context: ShortcodeContext, chapter?: any): string {
     let processed = template;
     const outline = JSON.parse(context.outline || "{}");
 
@@ -35,6 +35,10 @@ export class ShortcodeProcessor {
       '{{CHANNEL_NAME}}': context.channelName || '',
       '{{CHANNEL_DESCRIPTION}}': context.channelDescription || '',
       '{{imageCount}}': context.imageCount?.toString() || '8',
+      '{{VISUAL_STYLE}}': context.visualStyle || '',
+      '{{CHAPTER_NAME}}': chapter?.name || '',
+      '{{CHAPTER_DESCRIPTION}}': chapter?.description || '',
+      '{{CHAPTER_CONTENT}}': chapter?.content || '',
     };
 
     // Apply all replacements
