@@ -98,6 +98,7 @@ export default function EnhancedStoryTemplateForm({
       videoLength: template?.videoLength || 60,
       chapterImagePrompt: template?.chapterImagePrompt || "",
       chapterImageModel: template?.chapterImageModel || defaultPromptModel,
+      chapterImageFallbackModel: template?.chapterImageFallbackModel || defaultPromptModel,
       chapterContentPrompt: template?.chapterContentPrompt || "",
       chapterContentModel: template?.chapterContentModel || defaultPromptModel,
       imageCount: template?.imageCount || 8,
@@ -557,6 +558,13 @@ export default function EnhancedStoryTemplateForm({
                     name="chapterImageModel"
                     className="mt-4"
                     title="Chapter Image Model"
+                  />
+
+                  <PromptModelSelector
+                    form={form}
+                    name="chapterImageFallbackModel"
+                    className="mt-4"
+                    title="Chapter Image Fallback Model"
                   />
 
                   {/* <Separator />

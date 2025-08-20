@@ -95,6 +95,7 @@ export const videoTemplates = pgTable("video_templates", {
   chapterContentModel: jsonb("chapter_content_model").$type<PromptModel>().default(defaultPromptModel),
   chapterImagePrompt: text("chapter_image_prompt"),
   chapterImageModel: jsonb("chapter_image_model").$type<PromptModel>().default(defaultPromptModel),
+  chapterImageFallbackModel: jsonb("chapter_image_fallback_model").$type<PromptModel>().default({ ...defaultPromptModel, model: "gpt-5-mini" }),
   audioModel: text("audio_model").default("eleven_labs"),
   audioVoices: text("audio_voices").array(),
   audioPauseGap: integer("audio_pause_gap").default(500), // milliseconds
