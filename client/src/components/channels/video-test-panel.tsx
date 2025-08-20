@@ -356,14 +356,17 @@ const AiResponse = ({ videoId }: { videoId: number }) => {
           <TabsTrigger value="fullScript" className="flex items-center gap-1">
             Full Script
           </TabsTrigger>
+          <TabsTrigger value="visualStyle" className="flex items-center gap-1">
+            Visual Style
+          </TabsTrigger>
           <TabsTrigger value="hook" className="flex items-center gap-1">
             Hook
           </TabsTrigger>
-          <TabsTrigger value="images" className="flex items-center gap-1">
-            Image Prompt
+          <TabsTrigger value="chapterContent" className="flex items-center gap-1">
+            Chapter Contents
           </TabsTrigger>
-          <TabsTrigger value="imageAssignments" className="flex items-center gap-1">
-            Image Assignment
+          <TabsTrigger value="chapterImageData" className="flex items-center gap-1">
+            Chapter Image Data
           </TabsTrigger>
         </TabsList>
         <div className="rounded p-3 bg-muted mt-1">
@@ -376,13 +379,16 @@ const AiResponse = ({ videoId }: { videoId: number }) => {
           <TabsContent value="fullScript" className="space-y-6">
             <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
+          <TabsContent value="visualStyle" className="space-y-6">
+            <div dangerouslySetInnerHTML={{ __html: content }} />
+          </TabsContent>
           <TabsContent value="hook" className="space-y-6">
             <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
-          <TabsContent value="images" className="space-y-6">
+          <TabsContent value="chapterContent" className="space-y-6">
             <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
-          <TabsContent value="imageAssignments" className="space-y-6">
+          <TabsContent value="chapterImageData" className="space-y-6 overflow-auto">
             <div dangerouslySetInnerHTML={{ __html: content }} />
           </TabsContent>
         </div>

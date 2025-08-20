@@ -184,7 +184,7 @@ export class VideoWorkflowService {
         }
       });
 
-      throw error;
+      console.error("Failed to generate video:", error);
     }
   }
 
@@ -281,18 +281,25 @@ export class VideoWorkflowService {
     const imageCountRange = template.imageCountRange || { min: 3, max: 6 };
 
     const chapterImageData: ChapterImageData[] = [];
+    const diff = 25 / chapters.length;
+    const compositionsDir = path.join(aiResponseDir, `${videoId}`);
 
     for (let i = 0; i < chapters.length; i++) {
       const chapter = chapters[i];
-      await this.logProgress(videoId, "chapter_processing", 30 + (i * 10), `Processing chapter ${i + 1}: ${chapter.name}`);
+      console.log(`Processing chapter ${i + 1}: ${chapter.name}`);
+      await this.logProgress(videoId, "chapter_processing", Math.round(30 + diff * i), `Processing chapter ${i + 1}: ${chapter.name}`);
 
       // Generate chapter content
       const chapterContent = await this.generateChapterContent(template, context, chapter);
+      console.log(`Chapter content generated: ${chapterContent.slice(0, 50)}`);
+      const newContent = `\n\n\n---\n\nChapter ${i + 1}: ${chapter.name}\n\n${chapterContent}`;
+      await fs.appendFile(path.join(compositionsDir, "chapterContent.txt"), newContent);
 
       // Select random image count for this chapter
       const imageCount = Math.floor(Math.random() * (imageCountRange.max - imageCountRange.min + 1)) + imageCountRange.min;
 
       // Generate images for this chapter
+      console.log(`Generating ${imageCount} images`);
       const chapterImages = await this.generateImagesForChapter(template, context, chapterContent, imageCount);
 
       chapterImageData.push({
