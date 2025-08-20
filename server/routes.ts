@@ -286,7 +286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const templates = await storage.getVideoTemplates();
       res.json(templates);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch video templates" });
+      res.status(500).json({ message: `Failed to fetch video templates: ${(error as Error).message}` });
     }
   });
 
