@@ -444,7 +444,7 @@ export default function EnhancedStoryTemplateForm({
                               {...field}
                               value={field.value ?? undefined}
                             />
-                            <ShortcodeHelper includeChapter={true} includeChapterContent={true} />
+                            <ShortcodeHelper includeChapter={true} />
                           </div>
                         </FormControl>
                         <FormMessage />
