@@ -39,7 +39,6 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   FileText,
   Image,
@@ -60,14 +59,83 @@ interface EnhancedStoryTemplateFormProps {
   onSuccess?: () => void;
 }
 
-const SHORTCODE_INFO = [
-  { code: "{{IDEAS}}", description: "Current selected idea from ideas list" },
-  { code: "{{OUTLINE}}", description: "Generated story outline" },
-  { code: "{{SCRIPT}}", description: "Full generated script" },
-  { code: "{{TITLE}}", description: "Video title" },
-  { code: "{{IMAGES}}", description: "List of generated image descriptions" },
-  { code: "{{CHANNEL_NAME}}", description: "Channel name" },
-];
+interface ShortcodeProps {
+  includeChapter?: boolean;
+  includeChapterContent?: boolean;
+}
+
+function ShortcodeHelper({ includeChapter, includeChapterContent }: ShortcodeProps) {
+  const { toast } = useToast();
+
+  const onClick = (code: string) => {
+    // Copy the code
+    if (navigator && navigator.clipboard) {
+      navigator.clipboard.writeText(code).then(() => {
+        toast({ description: `Code ${code} copied` });
+      }).catch((err) => {
+        console.error(`Failed to copy code ${code}:`, err);
+      });
+    }
+  }
+
+  const shortcodes = [
+    { code: "{{IDEAS}}", description: "Current selected idea from ideas list" },
+    { code: "{{OUTLINE}}", description: "Generated story outline" },
+    { code: "{{SCRIPT}}", description: "Full generated script" },
+    { code: "{{TITLE}}", description: "Video title" },
+    { code: "{{SUMMARY}}", description: "Story summary from outline" },
+    { code: "{{IMAGES}}", description: "List of generated image descriptions" },
+    { code: "{{CHANNEL_NAME}}", description: "Channel name" },
+    { code: "{{CHANNEL_DESCRIPTION}}", description: "Channel description" },
+    { code: "{{imageCount}}", description: "Number of images to generate" },
+    { code: "{{VISUAL_STYLE}}", description: "Visual style description" },
+  ];
+
+  // Add chapter-related shortcodes conditionally
+  if (includeChapter) {
+    shortcodes.push(
+      { code: "{{CHAPTER_NAME}}", description: "Current chapter name" },
+      { code: "{{CHAPTER_DESCRIPTION}}", description: "Current chapter description" }
+    );
+  }
+
+  if (includeChapterContent) {
+    shortcodes.push(
+      { code: "{{CHAPTER_CONTENT}}", description: "Current chapter content" }
+    );
+  }
+
+  return (
+    <div className="mt-2 bg-primary/90 backdrop-blur-sm border border-primary/20 rounded-lg px-3 py-1.5">
+      <div className="flex items-center gap-1.5">
+        <Info className="size-4" />
+        <span className="font-medium">Shortcodes</span>
+      </div>
+      <div className="flex flex-wrap gap-1 mt-1">
+        {shortcodes.map((item, index) => (
+          <div
+            key={index}
+            className="group relative"
+            title={item.description}
+          >
+            <Badge
+              variant="secondary"
+              className="text-xs font-mono bg-primary-foreground/20 border-primary-foreground/30 cursor-help"
+              onClick={() => onClick(item.code)}
+            >
+              {item.code}
+            </Badge>
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-20">
+              {item.description}
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function EnhancedStoryTemplateForm({
   template,
@@ -159,29 +227,6 @@ export default function EnhancedStoryTemplateForm({
     createTemplateMutation.mutate(data);
   };
 
-  const ShortcodeInfo = () => (
-    <Card className="mb-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Info className="h-4 w-4" />
-          Available Shortcodes
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-          {SHORTCODE_INFO.map((item) => (
-            <div key={item.code} className="flex items-center gap-2">
-              <Badge variant="outline" className="font-mono text-xs">
-                {item.code}
-              </Badge>
-              <span className="text-muted-foreground">{item.description}</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <Form {...form}>
@@ -244,8 +289,6 @@ export default function EnhancedStoryTemplateForm({
 
             {/* Content Generation Tab */}
             <TabsContent value="content" className="space-y-6">
-              <ShortcodeInfo />
-
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -319,12 +362,15 @@ export default function EnhancedStoryTemplateForm({
                       <FormItem>
                         <FormLabel>Story Outline Prompt</FormLabel>
                         <FormControl>
-                          <Textarea
-                            placeholder={"Give me a story outline that follows this concept:\n\"\"\"\n{{IDEAS}}\"\"\"\n\nInclude 5 chapters with descriptive names.\n\nThe story should be engaging, and mysterious.\n\nTry to make it shocking or compelling. Consider real stories, novels or movies that have a similar premise, and use a similar twist or reveal. Don't confuse things by having multiple things happen. Add a little foreshadowing too, if appropriate. Make it clear in your outline, the important plot points, so that there is no confusion or contradictions in the story\n\nIt needs specifics, a title, characters, plot etc. Break the plot outline down into chapters, listing multiple things that happen in each chapter. Be original and creative. Make it really shocking. This is a horror. You will be writing this ultimately, so you need to come up with a good storyline. Your title MUST be unique, and fit the story, rather than create a story to fit the title.\n"}
-                            className="min-h-[120px]"
-                            {...field}
-                            value={field.value ?? undefined}
-                          />
+                          <div className="relative">
+                            <Textarea
+                              placeholder={"Give me a story outline that follows this concept:\n\"\"\"\n{{IDEAS}}\"\"\"\n\nInclude 5 chapters with descriptive names.\n\nThe story should be engaging, and mysterious.\n\nTry to make it shocking or compelling. Consider real stories, novels or movies that have a similar premise, and use a similar twist or reveal. Don't confuse things by having multiple things happen. Add a little foreshadowing too, if appropriate. Make it clear in your outline, the important plot points, so that there is no confusion or contradictions in the story\n\nIt needs specifics, a title, characters, plot etc. Break the plot outline down into chapters, listing multiple things that happen in each chapter. Be original and creative. Make it really shocking. This is a horror. You will be writing this ultimately, so you need to come up with a good storyline. Your title MUST be unique, and fit the story, rather than create a story to fit the title.\n"}
+                              className="min-h-[120px]"
+                              {...field}
+                              value={field.value ?? undefined}
+                            />
+                            <ShortcodeHelper includeChapter={false} includeChapterContent={false} />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -354,12 +400,15 @@ export default function EnhancedStoryTemplateForm({
                       <FormItem>
                         <FormLabel>Full Story Prompt</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            placeholder={"Based on this story outline, write a complete, engaging script for a YouTube video:\n\"\"\"\n{{OUTLINE}}\n\"\"\"\n\nWrite a full narrative script that:\n- Is approximately 2000-3000 words\n- Use conversational language, as if a person is explaining something to a friend.\n- Vary sentence length and pacing to sound more natural when read aloud.\n- Make transitions smooth and logical to maintain flow between ideas.\n- Avoid overly complex or literary phrasing—keep it simple and human.\n- Do **not** include scene directions or camera cues—just spoken narration."}
-                            className="min-h-[120px]"
-                            {...field}
-                            value={field.value ?? undefined}
-                          />
+                          <div className="relative">
+                            <Textarea
+                              placeholder={"Based on this story outline, write a complete, engaging script for a YouTube video:\n\"\"\"\n{{OUTLINE}}\n\"\"\"\n\nWrite a full narrative script that:\n- Is approximately 2000-3000 words\n- Use conversational language, as if a person is explaining something to a friend.\n- Vary sentence length and pacing to sound more natural when read aloud.\n- Make transitions smooth and logical to maintain flow between ideas.\n- Avoid overly complex or literary phrasing—keep it simple and human.\n- Do **not** include scene directions or camera cues—just spoken narration."}
+                              className="min-h-[120px]"
+                              {...field}
+                              value={field.value ?? undefined}
+                            />
+                            <ShortcodeHelper includeChapter={false} includeChapterContent={false} />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -389,11 +438,14 @@ export default function EnhancedStoryTemplateForm({
                       <FormItem>
                         <FormLabel>Chapter Content Prompt</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            className="min-h-[120px]"
-                            {...field}
-                            value={field.value ?? undefined}
-                          />
+                          <div className="relative">
+                            <Textarea
+                              className="min-h-[120px]"
+                              {...field}
+                              value={field.value ?? undefined}
+                            />
+                            <ShortcodeHelper includeChapter={true} includeChapterContent={true} />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -445,8 +497,6 @@ export default function EnhancedStoryTemplateForm({
 
             {/* Images Tab */}
             <TabsContent value="images" className="space-y-6">
-              <ShortcodeInfo />
-
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -518,11 +568,14 @@ export default function EnhancedStoryTemplateForm({
                       <FormItem>
                         <FormLabel>Visual Style Prompt *</FormLabel>
                         <FormControl>
-                          <Textarea
-                            className="min-h-[100px]"
-                            {...field}
-                            value={field.value ?? undefined}
-                          />
+                          <div className="relative">
+                            <Textarea
+                              className="min-h-[100px]"
+                              {...field}
+                              value={field.value ?? undefined}
+                            />
+                            <ShortcodeHelper includeChapter={false} includeChapterContent={false} />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -543,11 +596,14 @@ export default function EnhancedStoryTemplateForm({
                       <FormItem>
                         <FormLabel>Chapter Image Prompt</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            className="min-h-[120px]"
-                            {...field}
-                            value={field.value ?? undefined}
-                          />
+                          <div className="relative">
+                            <Textarea
+                              className="min-h-[120px]"
+                              {...field}
+                              value={field.value ?? undefined}
+                            />
+                            <ShortcodeHelper includeChapter={true} includeChapterContent={true} />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -728,12 +784,15 @@ export default function EnhancedStoryTemplateForm({
                       <FormItem>
                         <FormLabel>Music Selection Prompt</FormLabel>
                         <FormControl>
-                          <Textarea
-                            placeholder="Select appropriate background music for: {{OUTLINE}}&#10;&#10;Choose from horror, suspense, ambient, or cinematic tracks that match the mood. Consider the story's emotional arc."
-                            className="min-h-[100px]"
-                            {...field}
-                            value={field.value ?? undefined}
-                          />
+                          <div className="relative">
+                            <Textarea
+                              placeholder="Select appropriate background music for: {{OUTLINE}}&#10;&#10;Choose from horror, suspense, ambient, or cinematic tracks that match the mood. Consider the story's emotional arc."
+                              className="min-h-[100px]"
+                              {...field}
+                              value={field.value ?? undefined}
+                            />
+                            <ShortcodeHelper includeChapter={false} includeChapterContent={false} />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1178,7 +1237,7 @@ const VoiceSelectionDropdown: React.FC<{
           <FormLabel className="text-base font-medium">
             ElevenLabs Voices
           </FormLabel>
-          
+
           <div className="relative" ref={dropdownRef}>
             {/* Dropdown Trigger */}
             <button
@@ -1195,7 +1254,7 @@ const VoiceSelectionDropdown: React.FC<{
                   <span>{selectedVoices.length} voices selected</span>
                 )}
               </div>
-              
+
               <svg
                 className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
                 fill="none"
@@ -1291,46 +1350,46 @@ const VoiceSelectionDropdown: React.FC<{
                     </div>
                   ) : (
                     filteredVoices.map((voice) => {
-                    const isSelected = selectedVoices.includes(voice.voice_id);
-                    return (
-                      <div
-                        key={voice.voice_id}
-                        onClick={() => handleVoiceToggle(voice.voice_id)}
-                        className="flex items-center px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                      >
-                        <div className={`
+                      const isSelected = selectedVoices.includes(voice.voice_id);
+                      return (
+                        <div
+                          key={voice.voice_id}
+                          onClick={() => handleVoiceToggle(voice.voice_id)}
+                          className="flex items-center px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                        >
+                          <div className={`
                           w-4 h-4 border-2 rounded flex items-center justify-center mr-3 flex-shrink-0
-                          ${isSelected 
-                            ? 'border-primary bg-primary' 
-                            : 'border-muted-foreground/30'
-                          }
+                          ${isSelected
+                              ? 'border-primary bg-primary'
+                              : 'border-muted-foreground/30'
+                            }
                         `}>
-                          {isSelected && (
-                            <svg 
-                              className="w-2.5 h-2.5 text-primary-foreground" 
-                              fill="currentColor" 
-                              viewBox="0 0 20 20"
-                            >
-                              <path 
-                                fillRule="evenodd" 
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" 
-                                clipRule="evenodd" 
-                              />
-                            </svg>
-                          )}
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">
-                            {voice.name}
+                            {isSelected && (
+                              <svg
+                                className="w-2.5 h-2.5 text-primary-foreground"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {voice.category}
+
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">
+                              {voice.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {voice.category}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })
                   )}
                 </div>
               </div>
