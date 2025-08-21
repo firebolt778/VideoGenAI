@@ -12,6 +12,23 @@ interface Props {
 }
 
 export default function PromptModelSelector({ form, name, title, className }: Props) {
+  const onModelChange = (model: string) => {
+    form.setValue(`${name}.model`, model);
+    if (model.startsWith("gpt-5")) {
+      form.unregister(`${name}.temperature`);
+      form.unregister(`${name}.topP`);
+      form.unregister(`${name}.frequencyPenalty`);
+      form.unregister(`${name}.maxTokens`);
+      form.setValue(`${name}.effort`, "low");
+    } else {
+      form.unregister(`${name}.effort`);
+      form.setValue(`${name}.temperature`, 0.7);
+      form.setValue(`${name}.topP`, 0.9);
+      form.setValue(`${name}.frequencyPenalty`, 0);
+      form.setValue(`${name}.maxTokens`, 8192);
+    }
+  }
+
   return (
     <div className={cn("border rounded-lg p-4 bg-muted", className)}>
       <div className="text-lg font-medium">{title}</div>
@@ -22,7 +39,10 @@ export default function PromptModelSelector({ form, name, title, className }: Pr
           render={({ field }) => (
             <FormItem>
               <FormLabel>Model</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select
+                onValueChange={onModelChange}
+                value={field.value}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select model" />
@@ -39,6 +59,31 @@ export default function PromptModelSelector({ form, name, title, className }: Pr
           )}
         />
 
+        {form.watch(`${name}.model`).startsWith("gpt-5") && (
+          <FormField
+            control={form.control}
+            name={`${name}.effort`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Reasoning Effort</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select effort" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="minimal">Minimal</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         {!form.watch(`${name}.model`).startsWith("gpt-5") && (
           <FormField
             control={form.control}
@@ -51,7 +96,8 @@ export default function PromptModelSelector({ form, name, title, className }: Pr
                     type="number"
                     min={1}
                     placeholder="e.g. 500"
-                    {...field}
+                    value={field.value ?? 0}
+                    onChange={field.onChange}
                   />
                 </FormControl>
                 <FormMessage />
@@ -77,7 +123,8 @@ export default function PromptModelSelector({ form, name, title, className }: Pr
                     step={0.1}
                     placeholder="0.7"
                     disabled={form.watch(`${name}.model`) === "gpt-5"}
-                    {...field}
+                    value={field.value ?? 0}
+                    onChange={field.onChange}
                   />
                 </FormControl>
                 <FormMessage />
@@ -98,7 +145,8 @@ export default function PromptModelSelector({ form, name, title, className }: Pr
                     max={1}
                     step={0.1}
                     placeholder="0.9"
-                    {...field}
+                    value={field.value ?? 0}
+                    onChange={field.onChange}
                   />
                 </FormControl>
                 <FormMessage />
@@ -119,7 +167,8 @@ export default function PromptModelSelector({ form, name, title, className }: Pr
                     max={2}
                     step={0.1}
                     placeholder="0.0"
-                    {...field}
+                    value={field.value ?? 0}
+                    onChange={field.onChange}
                   />
                 </FormControl>
                 <FormMessage />

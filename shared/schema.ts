@@ -5,18 +5,16 @@ import { z } from "zod";
 
 export type PromptModel = {
   model: string;
-  temperature: number;
-  maxTokens: number;
-  topP: number;
-  frequencyPenalty: number;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  effort?: string;
 }
 
 export const defaultPromptModel: PromptModel = {
   model: "gpt-5",
-  temperature: 0.7,
-  maxTokens: 8192,
-  topP: 0.9,
-  frequencyPenalty: 0.0,
+  effort: "low",
 }
 
 export const users = pgTable("users", {

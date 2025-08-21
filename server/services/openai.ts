@@ -1,5 +1,6 @@
 import { PromptModel } from "@shared/schema";
 import OpenAI from "openai";
+import { ReasoningEffort } from "openai/resources/shared.mjs";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 export const openai = new OpenAI({ 
@@ -71,7 +72,7 @@ Respond with JSON in this exact format:
             content: prompt
           }
         ],
-        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
+        reasoning_effort: options?.effort as ReasoningEffort | undefined,
         response_format: { type: "json_object" },
         ...additionalParams
       });
@@ -127,7 +128,7 @@ Enclose the script content between --- markers like this:
             content: prompt
           }
         ],
-        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
+        reasoning_effort: options?.effort as ReasoningEffort | undefined,
         ...additionalParams
       });
 
@@ -182,7 +183,7 @@ ${outline}
             content: prompt
           }
         ],
-        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
+        reasoning_effort: options?.effort as ReasoningEffort | undefined,
         ...additionalParams
       });
 
@@ -238,7 +239,7 @@ Keep it under 1000 characters.`;
             content: prompt
           }
         ],
-        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
+        reasoning_effort: options?.effort as ReasoningEffort | undefined,
         ...additionalParams
       });
 
@@ -271,7 +272,7 @@ Keep it under 1000 characters.`;
             content: prompt
           }
         ],
-        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
+        reasoning_effort: options?.effort as ReasoningEffort | undefined,
         ...additionalParams
       });
 
@@ -304,7 +305,7 @@ Keep it under 1000 characters.`;
             content: prompt
           }
         ],
-        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
+        reasoning_effort: options?.effort as ReasoningEffort | undefined,
         ...additionalParams
       });
 
@@ -358,7 +359,7 @@ RESPOND WITH JSON ONLY. EXACT FORMAT (no markdown, no comments, no trailing comm
             content: prompt
           }
         ],
-        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
+        reasoning_effort: options?.effort as ReasoningEffort | undefined,
         response_format: { type: "json_object" },
         ...additionalParams
       });
@@ -410,7 +411,7 @@ Create a single, detailed prompt for thumbnail generation.`;
             content: prompt
           }
         ],
-        reasoning_effort: options?.model.startsWith("gpt-5") ? "low" : undefined,
+        reasoning_effort: options?.effort as ReasoningEffort | undefined,
         ...additionalParams
       });
 
