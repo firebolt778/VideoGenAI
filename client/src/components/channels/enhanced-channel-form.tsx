@@ -689,7 +689,6 @@ export default function EnhancedChannelForm({
                               <video
                                 src={form.watch("videoIntroUrl") ?? undefined}
                                 className="h-20 w-20 object-contain"
-                                controls
                               />
                             ) : (
                               <Upload className="h-10 w-10 text-gray-300" />
@@ -791,7 +790,6 @@ export default function EnhancedChannelForm({
                             <video
                               src={form.watch("videoOutroUrl") ?? undefined}
                               className="h-20 w-20 object-contain"
-                              controls
                             />
                           ) : (
                             <Upload className="h-10 w-10 text-gray-300" />
