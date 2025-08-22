@@ -384,7 +384,7 @@ export class VideoWorkflowService {
           // Create a placeholder segment
           audioSegments.push({
             text: image.scriptSegment,
-            filename: `placeholder_${i + 1}_${j + 1}.mp3`,
+            filename: 'placeholder.mp3',
             duration: elevenLabsService.estimateAudioDuration(image.scriptSegment)
           });
         }

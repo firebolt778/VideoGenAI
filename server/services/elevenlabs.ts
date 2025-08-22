@@ -133,7 +133,12 @@ export class ElevenLabsService {
         }
       } catch (error) {
         console.error(`Failed to generate audio for segment ${i + 1}:`, error);
-        // Continue with other segments even if one fails
+        console.log("Retrying...");
+        const audioSegment = await this.generateAudio(segment, voiceId, filename);
+        segments.push(audioSegment);
+        if (i < scriptSegments.length - 1) {
+          await this.sleep(pauseGap);
+        }
       }
     }
 
