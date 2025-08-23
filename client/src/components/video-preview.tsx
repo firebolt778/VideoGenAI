@@ -162,7 +162,7 @@ export default function VideoPreview({ video, isOpen, onClose }: VideoPreviewPro
             <Card>
               <CardContent className="p-4">
                 <Tabs defaultValue="idea" className="w-full" onValueChange={(e) => fetchLog(e)}>
-                  <TabsList className="grid w-full grid-cols-6">
+                  <TabsList className="grid w-full grid-cols-7">
                     <TabsTrigger value="idea" className="flex items-center gap-1">
                       Selected Idea
                     </TabsTrigger>

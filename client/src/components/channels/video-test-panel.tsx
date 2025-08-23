@@ -346,7 +346,7 @@ const AiResponse = ({ videoId }: { videoId: number }) => {
   return (
     <div className="border rounded-lg p-4 bg-muted/30 mt-2">
       <Tabs defaultValue="idea" className="w-full" onValueChange={(e) => fetchLog(e)}>
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="idea" className="flex items-center gap-1">
             Selected Idea
           </TabsTrigger>
