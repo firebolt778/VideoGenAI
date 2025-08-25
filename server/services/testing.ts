@@ -87,7 +87,7 @@ Include 5 chapters with descriptive names.
 The story should be engaging, mysterious, and suitable for visual storytelling.`;
 
     const outline = await openaiService.generateStoryOutline(idea, prompt, {
-      model: "gpt-5",
+      model: "gpt-5-mini",
       temperature: 0.7,
       maxTokens: 4000,
       topP: 1.0,
@@ -114,7 +114,7 @@ Write a full narrative script that:
 - Provides rich visual descriptions for image generation`;
 
     const script = await openaiService.generateFullScript(outline, prompt, {
-      model: "gpt-5",
+      model: "gpt-5-mini",
       temperature: 0.7,
       maxTokens: 4000,
       topP: 1.0,
@@ -141,7 +141,7 @@ Generate a visual style description that includes:
 This style will be used consistently across all images in the video.`;
 
     const visualStyle = await openaiService.generateVisualStyle(prompt, {
-      model: "gpt-5",
+      model: "gpt-5-mini",
       temperature: 0.7,
       maxTokens: 4000,
       topP: 1.0,
@@ -176,7 +176,7 @@ Generate a detailed, engaging chapter that:
 - Provides clear visual cues for image generation`;
 
       const content = await openaiService.generateChapterContent(prompt, {
-        model: "gpt-5",
+        model: "gpt-5-mini",
         temperature: 0.7,
         maxTokens: 4000,
         topP: 1.0,
@@ -224,6 +224,7 @@ ANCHOR RULES
 - For 1 < i < ${imageCount}: {"img":i, "start":"<exact phrase>", "end":"<exact phrase>"}
 - For i = ${imageCount}: {"img":${imageCount}, "start":"<exact phrase>", "end":"chapter_end"}
 - Anchors must be in strict reading order, non-overlapping, and collectively cover the chapter from start to end.
+- CRITICAL: Each anchor's end phrase should be DIFFERENT from the next anchor's start phrase. The start of anchor i+1 should be the same as the end of anchor i, creating seamless transitions without duplication.
 
 STYLE RULES
 - Start every image prompt with one identical single-line style string and repeat it verbatim.
@@ -262,13 +263,15 @@ CHAPTER TEXT:
 ${chapter.content}
 """`;
 
-      const response = await openaiService.generateChapterImages(mainPrompt, imageCount, {
-        model: "gpt-5",
+      const option = {
+        model: "gpt-5-mini",
         temperature: 0.7,
         maxTokens: 4000,
         topP: 1.0,
         frequencyPenalty: 0
-      });
+      }
+
+      const response = await openaiService.generateChapterImages(mainPrompt, imageCount, chapter.content, option);
 
       // Generate actual images using Flux (for testing, we'll just simulate this)
       const images = [];

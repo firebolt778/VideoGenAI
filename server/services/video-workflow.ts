@@ -320,12 +320,12 @@ export class VideoWorkflowService {
     const mainPrompt = ShortcodeProcessor.process(template.chapterImagePrompt || '', context, { content: chapterContent });
     let response: any;
     try {
-      response = await openaiService.generateChapterImages(mainPrompt, imageCount, template.chapterImageModel || undefined);
+      response = await openaiService.generateChapterImages(mainPrompt, imageCount, chapterContent, template.chapterImageModel || undefined);
     } catch (e) {
       console.error(e);
       console.error("Failed to generate image prompts: Retry with gpt-4o.");
       const option = template.chapterImageFallbackModel;
-      response = await openaiService.generateChapterImages(mainPrompt, imageCount, option || undefined);
+      response = await openaiService.generateChapterImages(mainPrompt, imageCount, chapterContent, option || undefined);
     }
 
     // Generate actual images using Flux

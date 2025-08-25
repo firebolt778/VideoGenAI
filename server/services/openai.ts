@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import { ReasoningEffort } from "openai/resources/shared.mjs";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-export const openai = new OpenAI({ 
+export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key"
 });
 
@@ -134,11 +134,11 @@ Enclose the script content between --- markers like this:
 
       const content = response.choices[0].message.content || "";
       const scriptMatch = content.match(/---\s*([\s\S]*?)\s*---/);
-      
+
       if (scriptMatch) {
         return scriptMatch[1].trim();
       }
-      
+
       return content;
     } catch (error) {
       throw new Error(`Failed to generate full script: ${(error as Error).message}`);
@@ -189,11 +189,11 @@ ${outline}
 
       const content = response.choices[0].message.content || "";
       const scriptMatch = content.match(/---\s*([\s\S]*?)\s*---/);
-      
+
       if (scriptMatch) {
         return scriptMatch[1].trim();
       }
-      
+
       return content;
     } catch (error) {
       throw new Error(`Failed to generate full script: ${(error as Error).message}`);
@@ -315,7 +315,12 @@ Keep it under 1000 characters.`;
     }
   }
 
-  async generateChapterImages(mainPrompt: string, imageCount: number, options?: PromptModel): Promise<{
+  async generateChapterImages(
+    mainPrompt: string,
+    imageCount: number,
+    chapterContent: string, // Add chapter content parameter
+    options?: PromptModel
+  ): Promise<{
     images: Array<{ description: string; scriptSegment: string }>;
     anchors: Array<{ img: number; start: string; end: string }>;
   }> {
@@ -342,11 +347,11 @@ RESPOND WITH JSON ONLY. EXACT FORMAT (no markdown, no comments, no trailing comm
   "images": [
     {
       "description": "<STYLE LINE REPEATED VERBATIM>\n<CAMERA: shot scale, lens mm/FOV, camera height or distance with units, angle, exact position relative to stable landmarks>\n<LAYOUT: one-sentence spatial map naming landmarks/axes and their relative positions suited to this environment>\n<COMPOSITION: what is at frame left/center/right and foreground/midground/background, with at least one compositional anchor>\n<fully self-contained scene description that fits only between the start and end anchors for image 1, restating setting and fixed details, with no comparative terms across images>",
-      "scriptSegment": "<verbatim chapter substring from the start anchor phrase through the end anchor phrase, inclusive>"
     }
     // ... one object per image in reading order (total ${imageCount})
   ]
-}`
+}`;
+
       const response = await openai.chat.completions.create({
         model: options?.model || "gpt-5",
         messages: [
@@ -365,12 +370,84 @@ RESPOND WITH JSON ONLY. EXACT FORMAT (no markdown, no comments, no trailing comm
       });
 
       const result = JSON.parse(response.choices[0].message.content || "{}");
+
+      // Generate scriptSegments programmatically
+      const imagesWithScriptSegments = this.addScriptSegments(
+        result.images || [],
+        result.anchors || [],
+        chapterContent
+      );
+
       return {
-        images: result.images || [],
+        images: imagesWithScriptSegments,
         anchors: result.anchors || []
       };
     } catch (error) {
       throw new Error(`Failed to generate chapter images: ${(error as Error).message}`);
+    }
+  }
+
+  // Helper function to extract script segments
+  private addScriptSegments(
+    images: Array<{ description: string }>,
+    anchors: Array<{ img: number; start: string; end: string }>,
+    chapterContent: string
+  ): Array<{ description: string; scriptSegment: string }> {
+    return images.map((image, index) => {
+      const anchor = anchors[index];
+      if (!anchor) {
+        return { ...image, scriptSegment: "" };
+      }
+
+      const scriptSegment = this.extractScriptSegment(
+        chapterContent,
+        anchor.start,
+        anchor.end
+      );
+
+      return {
+        ...image,
+        scriptSegment
+      };
+    });
+  }
+
+  // Helper function to extract text between anchors
+  private extractScriptSegment(
+    chapterContent: string,
+    startAnchor: string,
+    endAnchor: string
+  ): string {
+    try {
+      let startIndex = 0;
+      let endIndex = chapterContent.length;
+
+      // Handle start anchor
+      if (startAnchor !== "chapter_start") {
+        const startPos = chapterContent.indexOf(startAnchor);
+        if (startPos !== -1) {
+          startIndex = startPos;
+        }
+      }
+
+      // Handle end anchor
+      if (endAnchor !== "chapter_end") {
+        const endPos = chapterContent.indexOf(endAnchor);
+        if (endPos !== -1) {
+          // Include the end phrase in the segment
+          endIndex = endPos + endAnchor.length;
+        }
+      }
+
+      // Extract the segment
+      let segment = chapterContent.slice(startIndex, endIndex).trim();
+      if (segment.endsWith(endAnchor)) {
+        segment = segment.slice(0, -endAnchor.length).trim();
+      }
+      return segment.trim();
+    } catch (error) {
+      console.error(`Error extracting script segment: ${error}`);
+      return "";
     }
   }
 
