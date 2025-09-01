@@ -459,6 +459,7 @@ export class VideoWorkflowService {
         filename: hookAudio.filename || "",
         text: hookAudio.text || "",
         duration: Math.ceil((hookAudio.duration || 0) / 1000),
+        timestamps: hookAudio.timestamps || [],
       } : undefined,
       watermark: channel.watermarkUrl ? {
         url: channel.watermarkUrl,

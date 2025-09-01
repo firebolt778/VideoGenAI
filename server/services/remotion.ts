@@ -14,6 +14,11 @@ export interface RemotionVideoConfig {
     filename: string;
     text: string;
     duration: number;
+    timestamps?: Array<{
+      word: string;
+      start: number;
+      end: number;
+    }>;
   }>;
   imageAssignments: Array<{
     chapter: string;
@@ -27,6 +32,11 @@ export interface RemotionVideoConfig {
     filename: string;
     text: string;
     duration: number;
+    timestamps?: Array<{
+      word: string;
+      start: number;
+      end: number;
+    }>;
   };
   watermark?: {
     url: string;
@@ -225,6 +235,11 @@ interface StoryVideoProps {
     filename: string;
     text: string;
     duration: number;
+    timestamps?: Array<{
+      word: string;
+      start: number;
+      end: number;
+    }>;
   }>;
   imageAssignments: Array<{
     chapter: string;
@@ -238,6 +253,11 @@ interface StoryVideoProps {
     filename: string;
     text: string;
     duration: number;
+    timestamps?: Array<{
+      word: string;
+      start: number;
+      end: number;
+    }>;
   };
   watermark?: {
     url: string;
@@ -360,19 +380,25 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
 
   // Memoize segment timing calculations
   const segmentTimings = useMemo(() => {
+    let cumulativeTime = 0;
+
     return audioSegments.map((segment, index) => {
-      const audioDuration = audioSegments.slice(0, index).reduce((sum, seg) => sum + seg.duration, 0);
-      let segmentStartTime = audioDuration;
+      // Calculate cumulative time for all previous segments
+      let segmentStartTime = cumulativeTime;
+      const segmentDuration = segment.duration;
+
+      // Add chapter marker durations that occur before this segment
       for (let i = 0; i < chapterMarkers.length; i++) {
-        if (chapterMarkers[i].time > audioDuration) {
-          break;
+        if (chapterMarkers[i].time <= segmentStartTime) {
+          segmentStartTime += timingData.CHAPTER_MARKER_DURATION * 1000;
         }
-        segmentStartTime += timingData.CHAPTER_MARKER_DURATION * 1000;
       }
 
-      const segmentDuration = segment.duration;
       const segmentStartFrame = timingData.mainContentStartFrame + Math.round((segmentStartTime / 1000) * fps);
       const segmentEndFrame = segmentStartFrame + Math.round((segmentDuration / 1000) * fps);
+
+      // Update cumulative time for next segment
+      cumulativeTime += segmentDuration;
 
       return {
         startTime: segmentStartTime,
@@ -629,16 +655,137 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     );
   }, [frame, segmentTimings, effects, renderEffects]);
 
+  // Pre-compute phrase data to avoid recalculation on every frame
+  const phraseData = useMemo(() => {
+    const createPhraseData = (timestamps, wordsPerPhrase = 6) => {
+      if (!timestamps || timestamps.length === 0) return { phrases: [], phraseTimes: [] };
+
+      const phrases: string[] = [];
+      const phraseTimes: any[] = [];
+
+      for (let i = 0; i < timestamps.length; i += wordsPerPhrase) {
+        const phraseWords = timestamps.slice(i, i + wordsPerPhrase);
+        const phraseText = phraseWords.map(w => w.word).join(' ');
+        const phraseStart = phraseWords[0].start;
+        const phraseEnd = phraseWords[phraseWords.length - 1].end;
+
+        phrases.push(phraseText);
+        phraseTimes.push({ start: phraseStart, end: phraseEnd, index: i });
+      }
+
+      return { phrases, phraseTimes };
+    };
+
+    return {
+      hook: hookAudio?.timestamps ? createPhraseData(hookAudio.timestamps, 5) : { phrases: [], phraseTimes: [] },
+      segments: audioSegments.map(segment =>
+        segment.timestamps ? createPhraseData(segment.timestamps, 6) : { phrases: [], phraseTimes: [] }
+      )
+    };
+  }, [hookAudio, audioSegments]);
+
+  // Optimized function to find active phrase index
+  const findActivePhraseIndex = useCallback((timeMs, phraseTimes, bufferTime = 500) => {
+    // Early exit if no phrases
+    if (!phraseTimes || phraseTimes.length === 0) return -1;
+
+    // Binary search for better performance with many phrases
+    let left = 0;
+    let right = phraseTimes.length - 1;
+    let bestMatch = -1;
+
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      const phrase = phraseTimes[mid];
+      const adjustedStart = phrase.start - bufferTime;
+      const adjustedEnd = phrase.end + bufferTime;
+
+      if (timeMs >= adjustedStart && timeMs <= adjustedEnd) {
+        return mid; // Perfect match
+      }
+
+      if (timeMs < adjustedStart) {
+        right = mid - 1;
+      } else {
+        left = mid + 1;
+        bestMatch = mid; // Keep track of the closest phrase we've seen
+      }
+    }
+
+    // If no exact match, return closest phrase within reasonable distance
+    if (bestMatch >= 0) {
+      const distance = Math.abs(timeMs - phraseTimes[bestMatch].start);
+      if (distance <= 2000) return bestMatch;
+    }
+
+    return -1;
+  }, []);
+
+  // Pre-calculate opacity to avoid repeated calculations
+  const calculateOpacity = useCallback((timeMs, phraseTime, bufferTime, fadeInDuration, fadeOutDuration) => {
+    if (timeMs < phraseTime.start + fadeInDuration) {
+      return Math.max(0, Math.min(1, (timeMs - (phraseTime.start - bufferTime)) / fadeInDuration));
+    }
+    if (timeMs > phraseTime.end - fadeOutDuration) {
+      return Math.max(0, Math.min(1, ((phraseTime.end + bufferTime) - timeMs) / fadeOutDuration));
+    }
+    return 1;
+  }, []);
+
+  // Optimized renderCaptions with minimal recalculation
   const renderCaptions = useCallback(() => {
     if (!captions?.enabled || activeSegmentIndex === -1) return null;
 
     const currentSegment = audioSegments[activeSegmentIndex];
     const timing = segmentTimings[activeSegmentIndex];
-    const captionData = captionChunks.segments[activeSegmentIndex];
+    const segmentPhraseData = phraseData.segments[activeSegmentIndex];
 
+    // Use pre-computed phrase data if available
+    if (currentSegment.timestamps && segmentPhraseData.phrases.length > 0) {
+      const frameInSegment = frame - timing.startFrame;
+      const timeInSegmentMs = (frameInSegment / fps) * 1000;
+
+      const bufferTime = 150;
+      const currentPhraseIndex = findActivePhraseIndex(timeInSegmentMs, segmentPhraseData.phraseTimes, bufferTime);
+
+      if (currentPhraseIndex === -1) return null;
+
+      const phraseTime = segmentPhraseData.phraseTimes[currentPhraseIndex];
+      const opacity = calculateOpacity(timeInSegmentMs, phraseTime, bufferTime, 100, 100);
+
+      // Early exit if opacity is too low
+      if (opacity < 0.01) return null;
+
+      return (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: captions.position === 'bottom' ? '10%' : captions.position === 'top' ? '80%' : '45%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            color: captions.color || '#ffffff',
+            fontFamily: captions.font || 'Inter, sans-serif',
+            fontSize: '48px',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+            maxWidth: '80%',
+            lineHeight: 1.2,
+            background: 'rgba(0,0,0,0.4)',
+            borderRadius: '12px',
+            padding: '0.2em 0.6em',
+            opacity: opacity,
+          }}
+        >
+          {segmentPhraseData.phrases[currentPhraseIndex]}
+        </div>
+      );
+    }
+
+    // Fallback to chunk-based approach (unchanged for compatibility)
+    const captionData = captionChunks.segments[activeSegmentIndex];
     if (!captionData || captionData.chunks.length === 0) return null;
 
-    // Calculate which chunk should be displayed based on audio timing
     const frameInSegment = frame - timing.startFrame;
     const timeInSegmentMs = (frameInSegment / fps) * 1000;
 
@@ -651,7 +798,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         break;
       }
       accumulatedTime += captionData.durations[i];
-      chunkIndex = i + 1; // If we're past all chunks, show the last one
+      chunkIndex = i + 1;
     }
 
     const safeChunkIndex = Math.max(0, Math.min(chunkIndex, captionData.chunks.length - 1));
@@ -679,18 +826,63 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         {captionData.chunks[safeChunkIndex]}
       </div>
     );
-  }, [captions, activeSegmentIndex, audioSegments, segmentTimings, captionChunks, frame, timingData, fps]);
+  }, [captions, activeSegmentIndex, audioSegments, segmentTimings, captionChunks, frame, timingData, fps, phraseData, findActivePhraseIndex, calculateOpacity]);
 
+  // Optimized renderHookCaptions
   const renderHookCaptions = useCallback(() => {
     if (!captions?.enabled || !hookAudio || timingData.hookFrames === 0) return null;
 
     const isHookActive = frame >= timingData.hookStartFrame && frame < timingData.hookEndFrame;
     if (!isHookActive) return null;
 
+    const hookPhraseData = phraseData.hook;
+
+    // Use pre-computed phrase data if available
+    if (hookAudio.timestamps && hookPhraseData.phrases.length > 0) {
+      const frameInHook = frame - timingData.hookStartFrame;
+      const timeInHookMs = (frameInHook / fps) * 1000;
+
+      const bufferTime = 150;
+      const currentPhraseIndex = findActivePhraseIndex(timeInHookMs, hookPhraseData.phraseTimes, bufferTime);
+
+      if (currentPhraseIndex === -1) return null;
+
+      const phraseTime = hookPhraseData.phraseTimes[currentPhraseIndex];
+      const opacity = calculateOpacity(timeInHookMs, phraseTime, bufferTime, 100, 100);
+
+      // Early exit if opacity is too low
+      if (opacity < 0.01) return null;
+
+      return (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: captions.position === 'bottom' ? '10%' : captions.position === 'top' ? '80%' : '45%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            color: captions.color || '#ffffff',
+            fontFamily: captions.font || 'Inter, sans-serif',
+            fontSize: '52px',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            textShadow: '3px 3px 6px rgba(0,0,0,0.9)',
+            maxWidth: '85%',
+            lineHeight: 1.2,
+            background: 'rgba(0,0,0,0.5)',
+            borderRadius: '12px',
+            padding: '0.3em 0.7em',
+            opacity: opacity,
+          }}
+        >
+          {hookPhraseData.phrases[currentPhraseIndex]}
+        </div>
+      );
+    }
+
+    // Fallback to chunk-based approach (unchanged for compatibility)
     const captionData = captionChunks.hook;
     if (!captionData || captionData.chunks.length === 0) return null;
 
-    // Calculate which chunk should be displayed based on audio timing
     const frameInHook = frame - timingData.hookStartFrame;
     const timeInHookMs = (frameInHook / fps) * 1000;
 
@@ -703,7 +895,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         break;
       }
       accumulatedTime += captionData.durations[i];
-      chunkIndex = i + 1; // If we're past all chunks, show the last one
+      chunkIndex = i + 1;
     }
 
     const safeChunkIndex = Math.max(0, Math.min(chunkIndex, captionData.chunks.length - 1));
@@ -731,7 +923,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         {captionData.chunks[safeChunkIndex]}
       </div>
     );
-  }, [captions, hookAudio, timingData, frame, captionChunks, fps]);
+  }, [captions, hookAudio, timingData, frame, captionChunks, fps, phraseData, findActivePhraseIndex, calculateOpacity]);
 
   const renderChapterMarker = useCallback((markerIndex: number) => {
     const marker = chapterMarkers[markerIndex];
