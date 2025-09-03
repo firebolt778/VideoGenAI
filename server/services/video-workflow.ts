@@ -28,11 +28,11 @@ export interface ChapterImageData {
   images: Array<{
     filename: string;
     scriptSegment: string;
-    anchors: Array<{
+    anchor: {
       img: number;
       start: string;
       end: string;
-    }>;
+    };
   }>;
 }
 
@@ -316,7 +316,7 @@ export class VideoWorkflowService {
     context: ShortcodeContext,
     chapterContent: string,
     imageCount: number
-  ): Promise<Array<{ filename: string; scriptSegment: string; anchors: Array<{ img: number; start: string; end: string }> }>> {
+  ): Promise<Array<{ filename: string; scriptSegment: string; anchor: { img: number; start: string; end: string } }>> {
     const mainPrompt = ShortcodeProcessor.process(template.chapterImagePrompt || '', context, { content: chapterContent });
     let response: any;
     try {
@@ -342,7 +342,7 @@ export class VideoWorkflowService {
         images.push({
           filename: image.filename,
           scriptSegment: imagePrompt.scriptSegment,
-          anchors: response.anchors || []
+          anchor: response.anchors[i]
         });
       } catch (error) {
         console.error(`Failed to generate image ${i + 1}:`, error);

@@ -195,7 +195,7 @@ Generate a detailed, engaging chapter that:
   private async testChapterImageGeneration(
     chapterContents: Array<{ name: string; content: string }>,
     visualStyle: string
-  ): Promise<Array<{ chapter: string; images: Array<{ filename: string; scriptSegment: string; anchors: Array<{ img: number; start: string; end: string }> }> }>> {
+  ): Promise<Array<{ chapter: string; images: Array<{ filename: string; scriptSegment: string; anchor: { img: number; start: string; end: string } }> }>> {
 
     const chapterImageData = [];
     const imageCountRange = { min: 3, max: 5 }; // Test with smaller range
@@ -282,7 +282,7 @@ ${chapter.content}
           const mockImage = {
             filename: `test_chapter_${i + 1}_image_${j + 1}.jpg`,
             scriptSegment: imagePrompt.scriptSegment,
-            anchors: response.anchors || []
+            anchor: response.anchors[i]
           };
           images.push(mockImage);
 
@@ -308,7 +308,7 @@ ${chapter.content}
     fullScript: string;
     visualStyle: string;
     chapterContents: Array<{ name: string; content: string }>;
-    chapterImageData: Array<{ chapter: string; images: Array<{ filename: string; scriptSegment: string; anchors: Array<{ img: number; start: string; end: string }> }> }>;
+    chapterImageData: Array<{ chapter: string; images: Array<{ filename: string; scriptSegment: string; anchor: { img: number; start: string; end: string } }> }>;
   }): Promise<void> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const testDir = path.join(testOutputDir, `workflow-test-${timestamp}`);
@@ -349,7 +349,6 @@ ${chapter.content}
         images: c.images.map(img => ({
           filename: img.filename,
           scriptSegmentLength: img.scriptSegment.length,
-          anchorCount: img.anchors.length
         }))
       })),
       totalImages: results.chapterImageData.reduce((sum, c) => sum + c.images.length, 0)

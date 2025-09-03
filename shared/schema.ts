@@ -112,6 +112,7 @@ export const videoTemplates = pgTable("video_templates", {
   captionsFont: text("captions_font").default("Inter"),
   captionsColor: text("captions_color").default("#ffffff"),
   captionsPosition: text("captions_position").default("bottom"),
+  wordPerCaption: integer("word_per_caption").default(6).notNull(),
   videoTransitions: text("video_transitions").default("mix-fade"),
   transitionDuration: integer("transition_duration").default(2),
   createdAt: timestamp("created_at").defaultNow().notNull(),

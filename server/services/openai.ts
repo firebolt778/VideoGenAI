@@ -339,16 +339,25 @@ Keep it under 1000 characters.`;
 RESPOND WITH JSON ONLY. EXACT FORMAT (no markdown, no comments, no trailing commas):
 {
   "anchors": [
-    {"img":1, "start":"chapter_start", "end":"<exact phrase>"},
-    {"img":2, "start":"<exact phrase>", "end":"<exact phrase>"},
-    // ... continue sequentially for each i = 3…${imageCount - 1}
-    {"img":${imageCount}, "start":"<exact phrase>", "end":"chapter_end"}
-  ],
-  "images": [
     {
+      "img":1,
+      "start":"chapter_start",
+      "end":"<exact phrase>",
       "description": "<STYLE LINE REPEATED VERBATIM>\n<CAMERA: shot scale, lens mm/FOV, camera height or distance with units, angle, exact position relative to stable landmarks>\n<LAYOUT: one-sentence spatial map naming landmarks/axes and their relative positions suited to this environment>\n<COMPOSITION: what is at frame left/center/right and foreground/midground/background, with at least one compositional anchor>\n<fully self-contained scene description that fits only between the start and end anchors for image 1, restating setting and fixed details, with no comparative terms across images>",
-    }
-    // ... one object per image in reading order (total ${imageCount})
+    },
+    {
+      "img":2,
+      "start":"<exact phrase>",
+      "end":"<exact phrase>",
+      "description": "<STYLE LINE REPEATED VERBATIM>\n<CAMERA: shot scale, lens mm/FOV, camera height or distance with units, angle, exact position relative to stable landmarks>\n<LAYOUT: one-sentence spatial map naming landmarks/axes and their relative positions suited to this environment>\n<COMPOSITION: what is at frame left/center/right and foreground/midground/background, with at least one compositional anchor>\n<fully self-contained scene description that fits only between the start and end anchors for image 1, restating setting and fixed details, with no comparative terms across images>",
+    },
+    // ... continue sequentially for each i = 3…${imageCount - 1}
+    {
+      "img":${imageCount},
+      "start":"<exact phrase>",
+      "end":"chapter_end,
+      "description": "<STYLE LINE REPEATED VERBATIM>\n<CAMERA: shot scale, lens mm/FOV, camera height or distance with units, angle, exact position relative to stable landmarks>\n<LAYOUT: one-sentence spatial map naming landmarks/axes and their relative positions suited to this environment>\n<COMPOSITION: what is at frame left/center/right and foreground/midground/background, with at least one compositional anchor>\n<fully self-contained scene description that fits only between the start and end anchors for image 1, restating setting and fixed details, with no comparative terms across images>",
+    "}
   ]
 }`;
 
@@ -373,7 +382,6 @@ RESPOND WITH JSON ONLY. EXACT FORMAT (no markdown, no comments, no trailing comm
 
       // Generate scriptSegments programmatically
       const imagesWithScriptSegments = this.addScriptSegments(
-        result.images || [],
         result.anchors || [],
         chapterContent
       );
@@ -389,16 +397,10 @@ RESPOND WITH JSON ONLY. EXACT FORMAT (no markdown, no comments, no trailing comm
 
   // Helper function to extract script segments
   private addScriptSegments(
-    images: Array<{ description: string }>,
-    anchors: Array<{ img: number; start: string; end: string }>,
+    anchors: Array<{ img: number; start: string; end: string; description: string }>,
     chapterContent: string
   ): Array<{ description: string; scriptSegment: string }> {
-    return images.map((image, index) => {
-      const anchor = anchors[index];
-      if (!anchor) {
-        return { ...image, scriptSegment: "" };
-      }
-
+    return anchors.map((anchor) => {
       const scriptSegment = this.extractScriptSegment(
         chapterContent,
         anchor.start,
@@ -406,7 +408,7 @@ RESPOND WITH JSON ONLY. EXACT FORMAT (no markdown, no comments, no trailing comm
       );
 
       return {
-        ...image,
+        description: anchor.description,
         scriptSegment
       };
     });
