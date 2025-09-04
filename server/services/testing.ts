@@ -107,7 +107,7 @@ ${JSON.stringify(outline, null, 2)}
 Write a full narrative script that:
 - Is engaging and keeps viewers hooked
 - Has natural pacing and flow
-- Is approximately 2000-3000 words
+- Is approximately 1000-2000 words
 - Uses vivid, descriptive language
 - Maintains suspense throughout
 - Is divided into clear chapters
@@ -171,7 +171,7 @@ ${fullScript}
 Generate a detailed, engaging chapter that:
 - Expands on the chapter description
 - Maintains narrative flow
-- Is approximately 300-500 words
+- Is approximately 200-300 words
 - Uses vivid, descriptive language
 - Provides clear visual cues for image generation`;
 
@@ -225,6 +225,7 @@ ANCHOR RULES
 - For i = ${imageCount}: {"img":${imageCount}, "start":"<exact phrase>", "end":"chapter_end"}
 - Anchors must be in strict reading order, non-overlapping, and collectively cover the chapter from start to end.
 - CRITICAL: Each anchor's end phrase should be DIFFERENT from the next anchor's start phrase. The start of anchor i+1 should be the same as the end of anchor i, creating seamless transitions without duplication.
+- The number of words between the start and end phase must be greater than 10.
 
 STYLE RULES
 - Start every image prompt with one identical single-line style string and repeat it verbatim.
