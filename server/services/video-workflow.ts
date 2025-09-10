@@ -317,7 +317,7 @@ export class VideoWorkflowService {
     chapterContent: string,
     imageCount: number
   ): Promise<Array<{ filename: string; scriptSegment: string; anchor: { img: number; start: string; end: string } }>> {
-    const mainPrompt = ShortcodeProcessor.process(template.chapterImagePrompt || '', context, { content: chapterContent });
+    const mainPrompt = ShortcodeProcessor.process(template.chapterImagePrompt || '', { ...context, imageCount }, { content: chapterContent });
     let response: any;
     try {
       response = await openaiService.generateChapterImages(mainPrompt, imageCount, chapterContent, template.chapterImageModel || undefined);
