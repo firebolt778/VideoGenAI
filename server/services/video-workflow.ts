@@ -366,28 +366,34 @@ export class VideoWorkflowService {
       text: string;
       filename: string;
       duration?: number;
+      chapterIndex: number;
     }> = [];
 
     for (let i = 0; i < chapterImageData.length; i++) {
       const chapter = chapterImageData[i];
-      for (let j = 0; j < chapter.images.length; j++) {
-        const image = chapter.images[j];
-        try {
-          const segment = await elevenLabsService.generateAudio(
-            image.scriptSegment,
-            voiceId,
-            `audio_segment_${i + 1}_${j + 1}.mp3`
-          );
-          audioSegments.push(segment);
-        } catch (error) {
-          console.error(`Failed to generate audio for segment ${i + 1}-${j + 1}:`, error);
-          // Create a placeholder segment
-          audioSegments.push({
-            text: image.scriptSegment,
-            filename: 'placeholder.mp3',
-            duration: elevenLabsService.estimateAudioDuration(image.scriptSegment)
-          });
-        }
+      
+      // Combine all script segments for this chapter into one text
+      const chapterText = chapter.images.map(image => image.scriptSegment).join(' ');
+      
+      try {
+        const segment = await elevenLabsService.generateAudio(
+          chapterText,
+          voiceId,
+          `audio_chapter_${i + 1}.mp3`
+        );
+        audioSegments.push({
+          ...segment,
+          chapterIndex: i
+        });
+      } catch (error) {
+        console.error(`Failed to generate audio for chapter ${i + 1}:`, error);
+        // Create a placeholder segment
+        audioSegments.push({
+          text: chapterText,
+          filename: 'placeholder.mp3',
+          duration: elevenLabsService.estimateAudioDuration(chapterText),
+          chapterIndex: i
+        });
       }
     }
 
@@ -493,13 +499,14 @@ export class VideoWorkflowService {
     };
     if (channel.chapterIndicators) {
       const chapterMarkers: { text: string; time: number }[] = [];
+      let cumulativeTime = 0;
       for (let i = 0; i < chapterImageData.length; i++) {
-        const chapters = chapterImageData.slice(0, i).reduce((sum, chapter) => sum + chapter.images.length, 0);
-        const audio = audioSegments.slice(0, chapters);
         chapterMarkers.push({
           text: chapterImageData[i].chapter,
-          time: audio.reduce((sum, aud) => sum + (aud.duration || 0), 0),
+          time: cumulativeTime,
         });
+        // Add the duration of the current chapter's audio
+        cumulativeTime += audioSegments[i]?.duration || 0;
       }
       config.chapterMarkers = chapterMarkers;
       config.chapterMarkerBgColor = channel.chapterMarkerBgColor || undefined;

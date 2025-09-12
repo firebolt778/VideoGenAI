@@ -14,6 +14,7 @@ export interface RemotionVideoConfig {
     filename: string;
     text: string;
     duration: number;
+    chapterIndex: number;
     timestamps?: Array<{
       word: string;
       start: number;
@@ -25,6 +26,11 @@ export interface RemotionVideoConfig {
     images: Array<{
       filename: string;
       scriptSegment: string;
+      anchor?: {
+        img: number;
+        start: string;
+        end: string;
+      };
     }>;
   }>;
   bgAudio?: string;
@@ -57,6 +63,7 @@ export interface RemotionVideoConfig {
     font: string;
     color: string;
     position: string;
+    wordsPerTime?: number;
   };
   transitions?: {
     type: string;
@@ -235,6 +242,7 @@ interface StoryVideoProps {
     filename: string;
     text: string;
     duration: number;
+    chapterIndex: number;
     timestamps?: Array<{
       word: string;
       start: number;
@@ -246,6 +254,11 @@ interface StoryVideoProps {
     images: Array<{
       filename: string;
       scriptSegment: string;
+      anchor?: {
+        img: number;
+        start: string;
+        end: string;
+      };
     }>;
   }>;
   bgAudio?: string;
@@ -278,7 +291,7 @@ interface StoryVideoProps {
     font: string;
     color: string;
     position: string;
-    wordsPerTime: number;
+    wordsPerTime?: number;
   };
   transitions?: {
     type: string;
@@ -409,6 +422,88 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     });
   }, [audioSegments, chapterMarkers, timingData, fps]);
 
+  // Helper function to find timestamp for text anchor
+  const findTimestampForText = useCallback((text: string, timestamps: Array<{word: string; start: number; end: number}>, isEnd: boolean = false): number => {
+    if (!timestamps || timestamps.length === 0) return 0;
+    
+    // Handle special cases
+    if (text === "chapter_start") return 0;
+    if (text === "chapter_end") return timestamps[timestamps.length - 1]?.end || 0;
+    
+    // Find the timestamp that contains this text
+    const words = text.toLowerCase().split(' ');
+    let bestMatch = -1;
+    let bestScore = 0;
+    
+    for (let i = 0; i < timestamps.length; i++) {
+      const timestamp = timestamps[i];
+      const timestampWord = timestamp.word.toLowerCase();
+      
+      // Check if this word matches any of our search words
+      for (const searchWord of words) {
+        if (timestampWord.includes(searchWord) || searchWord.includes(timestampWord)) {
+          const score = Math.min(timestampWord.length, searchWord.length);
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = i;
+          }
+        }
+      }
+    }
+    
+    if (bestMatch === -1) {
+      // Fallback: estimate based on text position
+      const estimatedPosition = Math.floor((words.length / 10) * timestamps.length);
+      const safeIndex = Math.max(0, Math.min(estimatedPosition, timestamps.length - 1));
+      return isEnd ? timestamps[safeIndex].end : timestamps[safeIndex].start;
+    }
+    
+    return isEnd ? timestamps[bestMatch].end : timestamps[bestMatch].start;
+  }, []);
+
+  // Memoize image timing calculations - NEW: use anchor text to map to timestamps
+  const imageTimings = useMemo(() => {
+    const imageTimings: Array<{
+      startFrame: number;
+      endFrame: number;
+      chapterIndex: number;
+      imageIndex: number;
+    }> = [];
+
+    imageAssignments.forEach((assignment, chapterIndex) => {
+      const segmentTiming = segmentTimings[chapterIndex];
+      const audioSegment = audioSegments[chapterIndex];
+      if (!segmentTiming || !audioSegment || assignment.images.length === 0) return;
+
+      assignment.images.forEach((image, imageIndex) => {
+        if (!image.anchor) return;
+        
+        // Find start and end timestamps based on anchor text
+        const startTimeMs = findTimestampForText(image.anchor.start, audioSegment.timestamps || [], false);
+        const endTimeMs = findTimestampForText(image.anchor.end, audioSegment.timestamps || [], true);
+        
+        // Convert to frames relative to the segment start
+        const imageStartFrame = segmentTiming.startFrame + Math.round((startTimeMs / 1000) * fps);
+        const imageEndFrame = segmentTiming.startFrame + Math.round((endTimeMs / 1000) * fps);
+        
+        // Ensure valid frame ranges
+        const validStartFrame = Math.max(segmentTiming.startFrame, imageStartFrame);
+        const validEndFrame = Math.min(segmentTiming.endFrame, imageEndFrame);
+        
+        if (validStartFrame < validEndFrame) {
+          imageTimings.push({
+            startFrame: validStartFrame,
+            endFrame: validEndFrame,
+            chapterIndex,
+            imageIndex,
+          });
+        }
+      });
+    });
+
+    return imageTimings;
+  }, [imageAssignments, segmentTimings, audioSegments, findTimestampForText, fps]);
+
   // Audio duration estimation function
   const estimateAudioDuration = useCallback((text: string): number => {
     // Rough estimation: ~150 words per minute, ~5 characters per word
@@ -421,13 +516,14 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
 
   // Memoize caption chunks to avoid recalculation
   const captionChunks = useMemo(() => {
-    const getCaptionChunks = (text: string, maxWordsPerChunk = 10) => {
+    const getCaptionChunks = (text: string, maxWordsPerChunk?: number) => {
+      const wordsPerChunk = maxWordsPerChunk || captions?.wordsPerTime || 10;
       const words = text.split(' ');
       const chunks: string[] = [];
       const chunkDurations: number[] = [];
 
-      for (let i = 0; i < words.length; i += maxWordsPerChunk) {
-        const chunk = words.slice(i, i + maxWordsPerChunk).join(' ');
+      for (let i = 0; i < words.length; i += wordsPerChunk) {
+        const chunk = words.slice(i, i + wordsPerChunk).join(' ');
         chunks.push(chunk);
         chunkDurations.push(estimateAudioDuration(chunk));
       }
@@ -439,7 +535,7 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
       hook: hookAudio ? getCaptionChunks(hookAudio.text) : { chunks: [], durations: [] },
       segments: audioSegments.map(segment => getCaptionChunks(segment.text)),
     };
-  }, [hookAudio, audioSegments, estimateAudioDuration]);
+  }, [hookAudio, audioSegments, estimateAudioDuration, captions?.wordsPerTime]);
 
   // Find current active segment more efficiently
   const activeSegmentIndex = useMemo(() => {
@@ -451,6 +547,17 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
       frame >= timing.startFrame && frame < timing.endFrame
     );
   }, [frame, timingData, segmentTimings]);
+
+  // Find current active image index - NEW: works with image timing system
+  const activeImageIndex = useMemo(() => {
+    if (frame < timingData.mainContentStartFrame || frame >= timingData.mainContentEndFrame) {
+      return -1;
+    }
+
+    return imageTimings.findIndex(timing =>
+      frame >= timing.startFrame && frame < timing.endFrame
+    );
+  }, [frame, timingData, imageTimings]);
 
   // Memoize watermark styles
   const watermarkStyle = useMemo(() => {
@@ -628,18 +735,18 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
   ), [effects]);
 
   const renderImage = useCallback((image: any, index: number) => {
-    const timing = segmentTimings[index];
+    const timing = imageTimings[index];
     if (!timing) return null;
 
     const isActive = frame >= timing.startFrame && frame < timing.endFrame;
     if (!isActive) return null;
 
-    const segmentProgress = (frame - timing.startFrame) / (timing.endFrame - timing.startFrame);
+    const imageProgress = (frame - timing.startFrame) / (timing.endFrame - timing.startFrame);
     const kenBurnsScale = effects?.kenBurns ?
-      interpolate(segmentProgress, [0, 1], [1, 1.2]) : 1;
+      interpolate(imageProgress, [0, 1], [1, 1.2]) : 1;
 
     return (
-      <AbsoluteFill key={\`image-\${index}\`}>
+      <AbsoluteFill key={\`image-\${timing.chapterIndex}-\${timing.imageIndex}\`}>
         <Img
           src={image.filename}
           style={{
@@ -653,18 +760,19 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
         {renderEffects()}
       </AbsoluteFill>
     );
-  }, [frame, segmentTimings, effects, renderEffects]);
+  }, [frame, imageTimings, effects, renderEffects]);
 
   // Pre-compute phrase data to avoid recalculation on every frame
   const phraseData = useMemo(() => {
-    const createPhraseData = (timestamps, wordsPerPhrase = 6) => {
+    const createPhraseData = (timestamps) => {
       if (!timestamps || timestamps.length === 0) return { phrases: [], phraseTimes: [] };
 
+      const wordsPerChunk = captions?.wordsPerTime || 6;
       const phrases: string[] = [];
       const phraseTimes: any[] = [];
 
-      for (let i = 0; i < timestamps.length; i += wordsPerPhrase) {
-        const phraseWords = timestamps.slice(i, i + wordsPerPhrase);
+      for (let i = 0; i < timestamps.length; i += wordsPerChunk) {
+        const phraseWords = timestamps.slice(i, i + wordsPerChunk);
         const phraseText = phraseWords.map(w => w.word).join(' ');
         const phraseStart = phraseWords[0].start;
         const phraseEnd = phraseWords[phraseWords.length - 1].end;
@@ -677,12 +785,12 @@ export const StoryVideo: React.FC<StoryVideoProps> = ({
     };
 
     return {
-      hook: hookAudio?.timestamps ? createPhraseData(hookAudio.timestamps, 5) : { phrases: [], phraseTimes: [] },
+      hook: hookAudio?.timestamps ? createPhraseData(hookAudio.timestamps) : { phrases: [], phraseTimes: [] },
       segments: audioSegments.map(segment =>
-        segment.timestamps ? createPhraseData(segment.timestamps, 6) : { phrases: [], phraseTimes: [] }
+        segment.timestamps ? createPhraseData(segment.timestamps) : { phrases: [], phraseTimes: [] }
       )
     };
-  }, [hookAudio, audioSegments]);
+  }, [hookAudio, audioSegments, captions?.wordsPerTime]);
 
   // Optimized function to find active phrase index
   const findActivePhraseIndex = useCallback((timeMs, phraseTimes, bufferTime = 500) => {

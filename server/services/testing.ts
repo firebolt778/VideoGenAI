@@ -46,8 +46,13 @@ export class WorkflowTestService {
       const chapterImageData = await this.testChapterImageGeneration(chapterContents, visualStyle);
       console.log("✅ Images generated for", chapterImageData.length, "chapters");
 
-      // Step 7: Save all test results
-      console.log("\n💾 Step 7: Saving test results...");
+      // Step 7: Test audio generation for chapters
+      console.log("\n🎵 Step 7: Testing chapter-level audio generation...");
+      const audioResults = await this.testChapterAudioGeneration(chapterImageData);
+      console.log("✅ Audio generated for", audioResults.audioSegments.length, "chapters");
+
+      // Step 8: Save all test results
+      console.log("\n💾 Step 8: Saving test results...");
       await this.saveTestResults({
         testVideoId,
         idea,
@@ -55,7 +60,8 @@ export class WorkflowTestService {
         fullScript,
         visualStyle,
         chapterContents,
-        chapterImageData
+        chapterImageData,
+        audioResults
       });
 
       console.log("\n🎉 New workflow test completed successfully!");
@@ -302,6 +308,42 @@ ${chapter.content}
     return chapterImageData;
   }
 
+  private async testChapterAudioGeneration(
+    chapterImageData: Array<{ chapter: string; images: Array<{ filename: string; scriptSegment: string; anchor: { img: number; start: string; end: string } }> }>
+  ): Promise<{ audioSegments: Array<{ text: string; filename: string; duration?: number; chapterIndex: number }>; bgAudio?: string }> {
+
+    console.log("  🎵 Testing chapter-level audio generation...");
+
+    // Simulate the audio generation process
+    const audioSegments: Array<{ text: string; filename: string; duration?: number; chapterIndex: number }> = [];
+
+    for (let i = 0; i < chapterImageData.length; i++) {
+      const chapter = chapterImageData[i];
+
+      // Combine all script segments for this chapter into one text (same as the actual workflow)
+      const chapterText = chapter.images.map(image => image.scriptSegment).join(' ');
+
+      // For testing, we'll simulate the audio generation
+      const mockAudioSegment = {
+        text: chapterText,
+        filename: `test_audio_chapter_${i + 1}.mp3`,
+        duration: Math.max(5000, chapterText.length * 50), // Rough estimation: ~50ms per character
+        chapterIndex: i
+      };
+
+      audioSegments.push(mockAudioSegment);
+      console.log(`    ✅ Generated audio for chapter ${i + 1}: ${chapterText.substring(0, 50)}...`);
+    }
+
+    // Simulate background music generation
+    const bgAudio = "test_background_music.mp3";
+
+    return {
+      audioSegments,
+      bgAudio
+    };
+  }
+
   private async saveTestResults(results: {
     testVideoId: number;
     idea: string;
@@ -310,6 +352,7 @@ ${chapter.content}
     visualStyle: string;
     chapterContents: Array<{ name: string; content: string }>;
     chapterImageData: Array<{ chapter: string; images: Array<{ filename: string; scriptSegment: string; anchor: { img: number; start: string; end: string } }> }>;
+    audioResults: { audioSegments: Array<{ text: string; filename: string; duration?: number; chapterIndex: number }>; bgAudio?: string };
   }): Promise<void> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const testDir = path.join(testOutputDir, `workflow-test-${timestamp}`);
@@ -323,6 +366,7 @@ ${chapter.content}
     await fs.writeFile(path.join(testDir, '04-visual-style.txt'), results.visualStyle);
     await fs.writeFile(path.join(testDir, '05-chapter-contents.json'), JSON.stringify(results.chapterContents, null, 2));
     await fs.writeFile(path.join(testDir, '06-chapter-images.json'), JSON.stringify(results.chapterImageData, null, 2));
+    await fs.writeFile(path.join(testDir, '07-audio-results.json'), JSON.stringify(results.audioResults, null, 2));
 
     // Create a summary report
     const summary = {
@@ -352,7 +396,18 @@ ${chapter.content}
           scriptSegmentLength: img.scriptSegment.length,
         }))
       })),
-      totalImages: results.chapterImageData.reduce((sum, c) => sum + c.images.length, 0)
+      totalImages: results.chapterImageData.reduce((sum, c) => sum + c.images.length, 0),
+      audioResults: {
+        totalAudioSegments: results.audioResults.audioSegments.length,
+        totalAudioDuration: results.audioResults.audioSegments.reduce((sum, seg) => sum + (seg.duration || 0), 0),
+        audioSegments: results.audioResults.audioSegments.map(seg => ({
+          chapterIndex: seg.chapterIndex,
+          filename: seg.filename,
+          duration: seg.duration,
+          textLength: seg.text.length
+        })),
+        bgAudio: results.audioResults.bgAudio
+      }
     };
 
     await fs.writeFile(path.join(testDir, '00-summary.json'), JSON.stringify(summary, null, 2));
@@ -364,6 +419,8 @@ ${chapter.content}
     console.log(`   📜 Script: ${results.fullScript.length} characters`);
     console.log(`   🎨 Visual Style: ${results.visualStyle.substring(0, 50)}...`);
     console.log(`   🖼️ Total Images: ${summary.totalImages}`);
+    console.log(`   🎵 Audio Segments: ${summary.audioResults.totalAudioSegments}`);
+    console.log(`   ⏱️ Total Audio Duration: ${Math.round(summary.audioResults.totalAudioDuration / 1000)}s`);
     console.log(`   📁 Results saved to: ${testDir}`);
   }
 
