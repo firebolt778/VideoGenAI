@@ -219,7 +219,7 @@ Keep it under 1000 characters.`;
 
     try {
       let additionalParams: { [key: string]: any } = {};
-      if (!options?.model.startsWith("gpt-5")) {
+      if (!!options && !options.model.startsWith("gpt-5")) {
         additionalParams = {
           temperature: options?.temperature ?? 0.7,
           frequency_penalty: options?.frequencyPenalty ?? 0,
