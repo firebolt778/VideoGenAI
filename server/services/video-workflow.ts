@@ -149,11 +149,11 @@ export class VideoWorkflowService {
 
       // Step 10: Upload to YouTube (if not test mode)
       let youtubeId = "";
-      if (!testMode) {
+      // if (!testMode) {
         const description = await this.generateVideoDescription(title, fullScript, channel);
         youtubeId = await this.uploadToYouTube(videoPath, thumbnailPath, title, description, channel);
         await this.logProgress(videoId, "upload", 95, "Uploaded to YouTube");
-      }
+      // }
 
       // Step 11: Update video record
       await storage.updateVideo(videoId, {
