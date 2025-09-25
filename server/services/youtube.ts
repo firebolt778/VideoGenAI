@@ -122,10 +122,10 @@ export class YouTubeService {
       const videoId = response.data.id;
 
       // Upload thumbnail if provided
-      if (upload.thumbnailPath && videoId) {
-        console.log("Uploading thumbnail for video ID:", videoId);
-        await this.uploadThumbnail(videoId, upload.thumbnailPath);
-      }
+      // if (upload.thumbnailPath && videoId) {
+      //   console.log("Uploading thumbnail for video ID:", videoId);
+      //   await this.uploadThumbnail(videoId, upload.thumbnailPath);
+      // }
 
       return videoId || "No Video ID returned from upload";
     } catch (error) {
