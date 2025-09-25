@@ -108,6 +108,7 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
             toast({ title: "Test generation failed", variant: "destructive" });
           } else {
             setCurrentVideoId(videoId);
+            setIsVideoPreviewOpen(true);
             toast({ title: "Test video completed successfully" });
           }
         }
@@ -346,26 +347,26 @@ const AiResponse = ({ videoId }: { videoId: number }) => {
   return (
     <div className="border rounded-lg p-4 bg-muted/30 mt-2">
       <Tabs defaultValue="idea" className="w-full" onValueChange={(e) => fetchLog(e)}>
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="idea" className="flex items-center gap-1">
+        <TabsList className="grid w-full grid-cols-7 min-h-fit">
+          <TabsTrigger value="idea" className="flex items-center gap-1 text-wrap">
             Selected Idea
           </TabsTrigger>
           <TabsTrigger value="outline" className="flex items-center gap-1">
             Outline
           </TabsTrigger>
-          <TabsTrigger value="fullScript" className="flex items-center gap-1">
+          <TabsTrigger value="fullScript" className="flex items-center gap-1 text-wrap">
             Full Script
           </TabsTrigger>
-          <TabsTrigger value="visualStyle" className="flex items-center gap-1">
+          <TabsTrigger value="visualStyle" className="flex items-center gap-1 text-wrap">
             Visual Style
           </TabsTrigger>
           <TabsTrigger value="hook" className="flex items-center gap-1">
             Hook
           </TabsTrigger>
-          <TabsTrigger value="chapterContent" className="flex items-center gap-1">
+          <TabsTrigger value="chapterContent" className="flex items-center gap-1 text-wrap">
             Chapter Contents
           </TabsTrigger>
-          <TabsTrigger value="chapterImageData" className="flex items-center gap-1">
+          <TabsTrigger value="chapterImageData" className="flex items-center gap-1 text-wrap">
             Chapter Image Data
           </TabsTrigger>
         </TabsList>
