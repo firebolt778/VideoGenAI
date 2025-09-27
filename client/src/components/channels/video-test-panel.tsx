@@ -97,6 +97,13 @@ export default function VideoTestPanel({ channel }: VideoTestPanelProps) {
     const interval = setInterval(async () => {
       try {
         const response = await apiRequest("GET", `/api/videos/${videoId}/progress`);
+
+        // Handle 404 explicitly: retry on next interval
+        if (response.status === 404) {
+          console.warn(`Progress not found yet for video ${videoId}, retrying...`);
+          return; // don't stop polling
+        }
+
         const progress: TestProgress & { error?: string } = await response.json();
         setTestProgress(progress);
 
