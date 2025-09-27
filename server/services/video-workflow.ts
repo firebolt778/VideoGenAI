@@ -2,7 +2,7 @@ import { openaiService } from "./openai";
 import { AudioSegment, elevenLabsService } from "./elevenlabs";
 import { fluxService } from "./flux";
 import { remotionService, RemotionVideoConfig } from "./remotion";
-import { youtubeService } from "./youtube";
+import { YouTubeService } from "./youtube";
 import { backgroundMusicService } from "./background-music";
 import { ShortcodeProcessor, type ShortcodeContext } from "./shortcode";
 import { storage } from "../storage";
@@ -628,6 +628,7 @@ export class VideoWorkflowService {
     description: string,
     channel: Channel
   ): Promise<string> {
+    const youtubeService = new YouTubeService();
     await youtubeService.refreshAccessToken();
     const videoId = await youtubeService.uploadVideo({
       title,
