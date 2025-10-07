@@ -23,8 +23,21 @@ export class SchedulerService {
     this.isRunning = true;
     console.log('Scheduler started');
     
-    // Check for jobs every minute
+    // On start, schedule videos for all active channels
+    try {
+      const channels = await storage.getChannels();
+      const activeChannels = channels.filter(c => c.isActive && c.status === 'active');
+      for (const channel of activeChannels) {
+        await this.scheduleChannelVideos(channel);
+      }
+    } catch (e) {
+      this.isRunning = false;
+      console.warn('Scheduler initial scheduling failed:', e);
+    }
+
+    // Check for new/active channels and process jobs every minute
     this.interval = setInterval(async () => {
+      await this.refreshSchedules();
       await this.processScheduledJobs();
     }, 60000);
     
@@ -65,7 +78,11 @@ export class SchedulerService {
         id: jobId,
         channelId: channel.id,
         templateId: template.id,
-        scheduledAt: new Date(nextScheduleTime.getTime() + (i * 30 * 60 * 1000)), // 30 min apart
+        // Stagger by 30 minutes; if schedule time is in the past, run immediately
+        scheduledAt: (() => {
+          const time = new Date(nextScheduleTime.getTime() + (i * 30 * 60 * 1000));
+          return time <= new Date() ? new Date() : time;
+        })(),
         status: 'pending',
         retryCount: 0,
         maxRetries: 3
@@ -95,6 +112,22 @@ export class SchedulerService {
 
     for (const job of pendingJobs) {
       await this.executeJob(job);
+    }
+  }
+
+  private async refreshSchedules(): Promise<void> {
+    try {
+      const channels = await storage.getChannels();
+      const activeChannels = channels.filter(c => c.isActive && c.status === 'active');
+
+      for (const channel of activeChannels) {
+        const hasPending = Array.from(this.jobs.values()).some(j => j.channelId === channel.id && j.status === 'pending');
+        if (!hasPending) {
+          await this.scheduleChannelVideos(channel);
+        }
+      }
+    } catch (e) {
+      console.warn('Scheduler refresh failed:', e);
     }
   }
 
@@ -175,17 +208,33 @@ export class SchedulerService {
 
   private getNextScheduleTime(channel: Channel): Date {
     const now = new Date();
-    
-    switch (channel.schedule) {
-      case 'daily':
-        return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      case 'weekly':
-        return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      case 'custom':
-        // For custom, we'll use a default of daily
-        return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      default:
-        return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const last = channel.lastVideoGenerated ? new Date(channel.lastVideoGenerated) : null;
+
+    const intervalMs = (() => {
+      switch (channel.schedule) {
+        case 'daily':
+          return 24 * 60 * 60 * 1000;
+        case 'weekly':
+          return 7 * 24 * 60 * 60 * 1000;
+        case 'custom':
+          // Default to daily for now; future: read per-channel custom config
+          return 24 * 60 * 60 * 1000;
+        default:
+          return 24 * 60 * 60 * 1000;
+      }
+    })();
+
+    // If never generated, schedule now. If overdue, schedule now; else at due time.
+    if (!last) return now;
+    const dueAt = new Date(last.getTime() + intervalMs);
+    return dueAt <= now ? now : dueAt;
+  }
+
+  async scheduleAllActiveChannels(): Promise<void> {
+    const channels = await storage.getChannels();
+    const activeChannels = channels.filter(c => c.isActive && c.status === 'active');
+    for (const channel of activeChannels) {
+      await this.scheduleChannelVideos(channel);
     }
   }
 
