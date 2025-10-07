@@ -7,17 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Header from "@/components/layout/header";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 
 const apiKeys = [
   { key: "openai_api_key", label: "OpenAI API Key" },
   { key: "replicate_api_key", label: "Replicate API Key" },
   { key: "elevenlabs_api_key", label: "ElevenLabs API Key" },
-  { key: "youtube_api_key", label: "YouTube API Key" },
+  { key: "youtube_client_id", label: "YouTube Client ID" },
+  { key: "youtube_client_secret", label: "YouTube Client Secret" },
+  { key: "youtube_refresh_token", label: "YouTube Refresh Token" },
 ];
 
 const modelListKey = "model_list";
@@ -37,10 +40,16 @@ type Setting = {
 export default function Settings() {
   const { toast } = useToast();
   const [modelInputOpen, setModelInputOpen] = useState(false);
+  const [showPasswordByKey, setShowPasswordByKey] = useState<Record<string, boolean>>({});
 
   // Fetch all settings
   const { data: settings, refetch } = useQuery<Setting[]>({
     queryKey: ["/api/settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings");
+      if (!res.ok) throw new Error("Failed to fetch settings");
+      return res.json();
+    },
   });
 
   // API key form logic
@@ -115,6 +124,17 @@ export default function Settings() {
   // Get current model list
   const modelList: string[] = settings?.find(s => s.key === modelListKey)?.jsonValue || [];
 
+  // Fetch OpenAI models for dropdown
+  type OpenAIModel = { id: string; [key: string]: any };
+  const { data: openaiModels, isLoading: isModelsLoading } = useQuery<OpenAIModel[]>({
+    queryKey: ["/api/openai"],
+    queryFn: async () => {
+      const res = await fetch("/api/openai");
+      if (!res.ok) throw new Error("Failed to fetch OpenAI models");
+      return res.json();
+    }
+  });
+
   // Set form values from settings
   React.useEffect(() => {
     if (settings) {
@@ -150,8 +170,24 @@ export default function Settings() {
                     <FormItem className="mb-4">
                       <FormLabel>{label}</FormLabel>
                       <div className="flex gap-2">
-                        <FormControl>
-                          <Input type="password" {...field} autoComplete="off" />
+                        <FormControl className="shrink-0 grow">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type={showPasswordByKey[key] ? "text" : "password"}
+                              {...field}
+                              autoComplete="off"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setShowPasswordByKey(prev => ({ ...prev, [key]: !prev[key] }))}
+                              title={showPasswordByKey[key] ? "Hide" : "Show"}
+                              aria-label={showPasswordByKey[key] ? "Hide API key" : "Show API key"}
+                            >
+                              {showPasswordByKey[key] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </Button>
+                          </div>
                         </FormControl>
                         <Button type="button" onClick={() => handleApiKeySave(key)}>
                           Save
@@ -183,10 +219,24 @@ export default function Settings() {
                   <FormField
                     control={modelForm.control}
                     name="model"
-                    render={({ field }) => (
+                    render={() => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Model name" {...field} />
+                          <Select
+                            value={modelForm.watch("model")}
+                            onValueChange={(v) => modelForm.setValue("model", v)}
+                          >
+                            <SelectTrigger className="w-[300px]">
+                              <SelectValue placeholder={isModelsLoading ? "Loading models..." : "Select a model"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(openaiModels || []).map((m) => (
+                                <SelectItem key={m.id} value={m.id}>
+                                  {m.id}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -194,6 +244,7 @@ export default function Settings() {
                   />
                   <Button
                     type="button"
+                    disabled={!modelForm.watch("model")}
                     onClick={modelForm.handleSubmit(data => addModel.mutate(data.model))}
                   >
                     Add

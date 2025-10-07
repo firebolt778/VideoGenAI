@@ -1,4 +1,5 @@
-import { google } from 'googleapis';
+import { google, youtube_v3 } from 'googleapis';
+import type { OAuth2Client } from 'google-auth-library';
 
 export interface YouTubeVideoUpload {
   title: string;
@@ -28,14 +29,27 @@ export interface YouTubeScheduleSettings {
 }
 
 export class YouTubeService {
-  private youtube;
-  private oauth2Client;
+  private youtube: youtube_v3.Youtube | undefined;
+  private oauth2Client: OAuth2Client | undefined;
 
-  constructor() {
-    const clientId = process.env.YOUTUBE_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID_ENV_VAR;
-    const clientSecret = process.env.YOUTUBE_CLIENT_SECRET || process.env.YOUTUBE_CLIENT_SECRET_ENV_VAR;
-    const redirectUri = process.env.YOUTUBE_REDIRECT_URI || process.env.YOUTUBE_REDIRECT_URI_ENV_VAR || "http://localhost:5000/callback";
-    const refreshToken = process.env.YOUTUBE_REFRESH_TOKEN;
+  constructor() {}
+
+  private async ensureClientInitialized() {
+    if (this.youtube && this.oauth2Client) return;
+    const { storage } = await import("../storage");
+    const idSetting = await storage.getSetting("youtube_client_id");
+    const secretSetting = await storage.getSetting("youtube_client_secret");
+    const refreshSetting = await storage.getSetting("youtube_refresh_token");
+    const redirectSetting = await storage.getSetting("youtube_redirect_uri");
+
+    const clientId = (idSetting?.value || process.env.YOUTUBE_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID_ENV_VAR || "").trim();
+    const clientSecret = (secretSetting?.value || process.env.YOUTUBE_CLIENT_SECRET || process.env.YOUTUBE_CLIENT_SECRET_ENV_VAR || "").trim();
+    const redirectUri = (redirectSetting?.value || process.env.YOUTUBE_REDIRECT_URI || process.env.YOUTUBE_REDIRECT_URI_ENV_VAR || "http://localhost:5000/callback").trim();
+    const refreshToken = (refreshSetting?.value || process.env.YOUTUBE_REFRESH_TOKEN || "").trim();
+
+    if (!clientId || !clientSecret) {
+      throw new Error("YouTube client credentials are not configured. Set them in Settings or environment.");
+    }
 
     this.oauth2Client = new google.auth.OAuth2(
       clientId,
@@ -44,15 +58,15 @@ export class YouTubeService {
     );
 
     if (refreshToken) {
-      this.oauth2Client.setCredentials({
-        refresh_token: refreshToken
-      });
+      this.oauth2Client.setCredentials({ refresh_token: refreshToken });
     }
 
-    this.youtube = google.youtube({
-      version: 'v3',
-      auth: this.oauth2Client
-    });
+    this.youtube = google.youtube({ version: 'v3', auth: this.oauth2Client });
+  }
+
+  private async getClients(): Promise<{ yt: youtube_v3.Youtube; oauth: OAuth2Client }> {
+    await this.ensureClientInitialized();
+    return { yt: this.youtube as youtube_v3.Youtube, oauth: this.oauth2Client as OAuth2Client };
   }
 
   getAuthUrl(): string {
@@ -61,6 +75,14 @@ export class YouTubeService {
       'https://www.googleapis.com/auth/youtube.readonly',
     ];
 
+    // Note: This method does not require DB values; will use default client if ensureClientInitialized not called yet.
+    if (!this.oauth2Client) {
+      // Fallback ephemeral client for URL generation using env vars
+      const clientId = process.env.YOUTUBE_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID_ENV_VAR || '';
+      const clientSecret = process.env.YOUTUBE_CLIENT_SECRET || process.env.YOUTUBE_CLIENT_SECRET_ENV_VAR || '';
+      const redirectUri = process.env.YOUTUBE_REDIRECT_URI || process.env.YOUTUBE_REDIRECT_URI_ENV_VAR || 'http://localhost:5000/callback';
+      this.oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+    }
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent', // Ensures refresh token is sent every time
@@ -70,19 +92,21 @@ export class YouTubeService {
 
   async setCredentials(code: string): Promise<void> {
     try {
-      const { tokens } = await this.oauth2Client.getToken(code);
-      this.oauth2Client.setCredentials(tokens);
+      const { oauth } = await this.getClients();
+      const { tokens } = await oauth.getToken(code);
+      oauth.setCredentials(tokens);
     } catch (error) {
       throw new Error(`Failed to set YouTube credentials: ${(error as Error).message}`);
     }
   }
 
   async refreshAccessToken() {
-    const tokenResponse = await this.oauth2Client.getAccessToken();
+    const { oauth } = await this.getClients();
+    const tokenResponse = await oauth.getAccessToken();
     if (!tokenResponse.token) {
       throw new Error("Failed to refresh access token.");
     }
-    this.oauth2Client.setCredentials({
+    oauth.setCredentials({
       refresh_token: process.env.YOUTUBE_REFRESH_TOKEN,
       access_token: tokenResponse.token,
     });
@@ -90,6 +114,7 @@ export class YouTubeService {
 
   async uploadVideo(upload: YouTubeVideoUpload): Promise<string> {
     try {
+      const { yt } = await this.getClients();
       const fs = await import('fs');
 
       const filePath = upload.videoFilePath;
@@ -118,7 +143,7 @@ export class YouTubeService {
         uploadType: 'resumable',
       };
 
-      const response = await this.youtube.videos.insert(requestParameters);
+      const response = await yt.videos.insert(requestParameters);
       const videoId = response.data.id;
 
       // Upload thumbnail if provided
@@ -135,6 +160,7 @@ export class YouTubeService {
 
   async uploadThumbnail(videoId: string, thumbnailPath: string): Promise<void> {
     try {
+      const { yt } = await this.getClients();
       let path = thumbnailPath;
       if (!path) {
         throw new Error('Thumbnail path is required');
@@ -147,7 +173,7 @@ export class YouTubeService {
         throw new Error(`Thumbnail file not found: ${thumbnailPath}`);
       }
       
-      await this.youtube.thumbnails.set({
+      await yt.thumbnails.set({
         videoId: videoId,
         media: {
           body: fs.createReadStream(path),
@@ -185,7 +211,8 @@ export class YouTubeService {
 
   async getVideoStats(videoId: string): Promise<any> {
     try {
-      const response = await this.youtube.videos.list({
+      const { yt } = await this.getClients();
+      const response = await yt.videos.list({
         part: ['statistics', 'snippet'],
         id: [videoId],
       });
@@ -198,7 +225,8 @@ export class YouTubeService {
 
   async scheduleVideo(videoId: string, publishAt: Date): Promise<void> {
     try {
-      await this.youtube.videos.update({
+      const { yt } = await this.getClients();
+      await yt.videos.update({
         part: ['status'],
         requestBody: {
           id: videoId,
@@ -215,7 +243,8 @@ export class YouTubeService {
 
   async updateVideoPrivacy(videoId: string, privacyStatus: 'private' | 'public' | 'unlisted'): Promise<void> {
     try {
-      await this.youtube.videos.update({
+      const { yt } = await this.getClients();
+      await yt.videos.update({
         part: ['status'],
         requestBody: {
           id: videoId,
@@ -236,6 +265,7 @@ export class YouTubeService {
     categoryId?: string;
   }): Promise<void> {
     try {
+      const { yt } = await this.getClients();
       const updateData: any = { id: videoId };
       
       if (metadata.title || metadata.description || metadata.tags || metadata.categoryId) {
@@ -246,7 +276,7 @@ export class YouTubeService {
         if (metadata.categoryId) updateData.snippet.categoryId = metadata.categoryId;
       }
 
-      await this.youtube.videos.update({
+      await yt.videos.update({
         part: ['snippet'],
         requestBody: updateData,
       });
@@ -257,7 +287,8 @@ export class YouTubeService {
 
   async getScheduledVideos(): Promise<any[]> {
     try {
-      const response = await this.youtube.search.list({
+      const { yt } = await this.getClients();
+      const response = await yt.search.list({
         part: ['snippet'],
         forMine: true,
         type: ['video'],
@@ -273,7 +304,8 @@ export class YouTubeService {
 
   async deleteVideo(videoId: string): Promise<void> {
     try {
-      await this.youtube.videos.delete({
+      const { yt } = await this.getClients();
+      await yt.videos.delete({
         id: videoId,
       });
     } catch (error) {
@@ -291,5 +323,3 @@ export class YouTubeService {
     };
   }
 }
-
-export const youtubeService = new YouTubeService();

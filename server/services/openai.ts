@@ -1,11 +1,17 @@
 import { PromptModel } from "@shared/schema";
 import OpenAI from "openai";
+import { storage } from "../storage";
 import { ReasoningEffort } from "openai/resources/shared.mjs";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-export const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key"
-});
+export async function getOpenAI(): Promise<OpenAI> {
+  const dbKey = await storage.getSetting("openai_api_key");
+  const apiKey = (dbKey?.value || process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "").trim();
+  if (!apiKey) {
+    throw new Error("OpenAI API key is not configured. Set it in Settings or environment.");
+  }
+  return new OpenAI({ apiKey });
+}
 
 export interface StoryOutline {
   title: string;
@@ -33,6 +39,18 @@ export interface ImageAssignment {
 }
 
 export class OpenAIService {
+  async getOpenAiModels() {
+    const client = await getOpenAI();
+    const models = await client.models.list();
+    // Sort models alphabetically by id before returning
+    const sortedModels = models.data.slice().sort((a, b) => {
+      if (a.id < b.id) return -1;
+      if (a.id > b.id) return 1;
+      return 0;
+    });
+    return sortedModels;
+  }
+
   async generateStoryOutline(idea: string, customPrompt?: string, options?: PromptModel): Promise<StoryOutline> {
     let prompt = customPrompt || `
 Create a compelling story outline for a YouTube video based on this idea: "${idea}"
@@ -60,7 +78,8 @@ Respond with JSON in this exact format:
           top_p: options?.topP || 1.0
         }
       }
-      const response = await openai.chat.completions.create({
+      const client = await getOpenAI();
+      const response = await client.chat.completions.create({
         model: options?.model || "gpt-4o",
         messages: [
           {
@@ -116,7 +135,8 @@ Enclose the script content between --- markers like this:
           top_p: options?.topP || 1.0
         }
       }
-      const response = await openai.chat.completions.create({
+      const client = await getOpenAI();
+      const response = await client.chat.completions.create({
         model: options?.model || "gpt-5",
         messages: [
           {
@@ -171,7 +191,8 @@ ${outline}
           top_p: options?.topP || 1.0
         }
       }
-      const response = await openai.chat.completions.create({
+      const client = await getOpenAI();
+      const response = await client.chat.completions.create({
         model: options?.model || "gpt-5",
         messages: [
           {
@@ -227,7 +248,8 @@ Keep it under 1000 characters.`;
           top_p: options?.topP || 1.0
         }
       }
-      const response = await openai.chat.completions.create({
+      const client = await getOpenAI();
+      const response = await client.chat.completions.create({
         model: options?.model || "gpt-5",
         messages: [
           {
@@ -260,7 +282,8 @@ Keep it under 1000 characters.`;
           top_p: options?.topP || 1.0
         }
       }
-      const response = await openai.chat.completions.create({
+      const client = await getOpenAI();
+      const response = await client.chat.completions.create({
         model: options?.model || "gpt-5",
         messages: [
           {
@@ -293,7 +316,8 @@ Keep it under 1000 characters.`;
           top_p: options?.topP || 1.0
         }
       }
-      const response = await openai.chat.completions.create({
+      const client = await getOpenAI();
+      const response = await client.chat.completions.create({
         model: options?.model || "gpt-5",
         messages: [
           {
@@ -361,7 +385,8 @@ RESPOND WITH JSON ONLY. EXACT FORMAT (no markdown, no comments, no trailing comm
   ]
 }`;
 
-      const response = await openai.chat.completions.create({
+      const client = await getOpenAI();
+      const response = await client.chat.completions.create({
         model: options?.model || "gpt-5",
         messages: [
           {
@@ -478,7 +503,8 @@ Create a single, detailed prompt for thumbnail generation.`;
           top_p: options?.topP || 1.0
         }
       }
-      const response = await openai.chat.completions.create({
+      const client = await getOpenAI();
+      const response = await client.chat.completions.create({
         model: options?.model || "gpt-5",
         messages: [
           {

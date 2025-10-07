@@ -8,6 +8,7 @@ import path from "path";
 import fs from "fs/promises";
 import * as fsSync from "fs";
 import { elevenLabsService } from "./services/elevenlabs";
+import { openaiService } from "./services/openai";
 import { getVideoDuration } from "./utils/video-metadata";
 
 // Configure multer for file uploads
@@ -977,6 +978,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Schedule all active channels
+  app.post("/api/scheduler/schedule-all", async (req, res) => {
+    try {
+      const { schedulerService } = await import("./services/scheduler");
+      await schedulerService.scheduleAllActiveChannels();
+      res.json({ message: "All active channels scheduled successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to schedule all channels" });
+    }
+  });
+
   app.post("/api/scheduler/schedule/:channelId", async (req, res) => {
     try {
       const channelId = parseInt(req.params.channelId);
@@ -1082,6 +1094,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(voices);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch ElevenLabs voices" });
+    }
+  });
+
+  // OpenAI models
+  app.get("/api/openai", async (req, res) => {
+    try {
+      const { openaiService } = await import("./services/openai");
+      const models = await openaiService.getOpenAiModels();
+      res.json(models);
+    } catch (error) {
+      const e = error as Error;
+      res.status(500).json({ message: `Failed to fetch OpenAI models: ${e.message}` });
     }
   });
 

@@ -23,7 +23,19 @@ export class ElevenLabsService {
   private availableVoices: ElevenLabsVoice[] = [];
 
   constructor() {
-    this.apiKey = process.env.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY_ENV_VAR || "default_key";
+    this.apiKey = process.env.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY_ENV_VAR || "";
+  }
+
+  private async getApiKey(): Promise<string> {
+    if (this.apiKey && this.apiKey.length > 0) return this.apiKey;
+    const { storage } = await import("../storage");
+    const dbKey = await storage.getSetting("elevenlabs_api_key");
+    const key = (dbKey?.value || process.env.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY_ENV_VAR || "").trim();
+    if (!key) {
+      throw new Error("ElevenLabs API key is not configured. Set it in Settings or environment.");
+    }
+    this.apiKey = key;
+    return key;
   }
 
   async getAvailableVoices(): Promise<ElevenLabsVoice[]> {
@@ -33,7 +45,7 @@ export class ElevenLabsService {
     try {
       const response = await fetch(`${this.baseUrl}/voices`, {
         headers: {
-          'xi-api-key': this.apiKey,
+          'xi-api-key': await this.getApiKey(),
         },
       });
 
@@ -71,7 +83,7 @@ export class ElevenLabsService {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'xi-api-key': this.apiKey,
+          'xi-api-key': await this.getApiKey(),
         },
         body: JSON.stringify({
           text: text,

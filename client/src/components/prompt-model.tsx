@@ -1,4 +1,4 @@
-import { llmModels } from "@/lib/llms";
+import { useQuery } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "./ui/form";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -12,6 +12,18 @@ interface Props {
 }
 
 export default function PromptModelSelector({ form, name, title, className }: Props) {
+  const modelListKey = "model_list";
+
+  const { data: settings } = useQuery<{ key: string; value: string | null; jsonValue?: any; }[]>({
+    queryKey: ["/api/settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings");
+      if (!res.ok) throw new Error("Failed to fetch settings");
+      return res.json();
+    },
+  });
+
+  const modelList: string[] = settings?.find(s => s.key === modelListKey)?.jsonValue || [];
   const onModelChange = (model: string) => {
     form.setValue(`${name}.model`, model);
     if (model.startsWith("gpt-5")) {
@@ -49,8 +61,8 @@ export default function PromptModelSelector({ form, name, title, className }: Pr
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {llmModels.map((model, index) => (
-                    <SelectItem key={index} value={model.value}>{model.label}</SelectItem>
+                  {modelList.map((model) => (
+                    <SelectItem key={model} value={model}>{model}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

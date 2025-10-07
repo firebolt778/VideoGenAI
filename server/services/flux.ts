@@ -1,4 +1,5 @@
-import { openai } from "./openai";
+import { getOpenAI } from "./openai";
+import { storage } from "../storage";
 
 export interface FluxImageOptions {
   prompt: string;
@@ -24,7 +25,46 @@ export class FluxService {
   private baseUrl = "https://api.replicate.com/v1";
 
   constructor() {
-    this.apiToken = process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_TOKEN_ENV_VAR || "default_key";
+    this.apiToken = process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_TOKEN_ENV_VAR || "";
+  }
+
+  private async getApiToken(): Promise<string> {
+    if (this.apiToken && this.apiToken.length > 0) return this.apiToken;
+    const dbToken = await storage.getSetting("replicate_api_key");
+    const token = (dbToken?.value || process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_TOKEN_ENV_VAR || "").trim();
+    if (!token) {
+      throw new Error("Replicate API token is not configured. Set it in Settings or environment.")
+    }
+    this.apiToken = token;
+    return token;
+  }
+
+  async getAvailableModels(cursor?: string) {
+    try {
+      const baseUrl = `${this.baseUrl}/models`;
+      const params = new URLSearchParams({});
+      if (cursor) {
+        params.append('cursor', cursor);
+      }
+      const url = `${baseUrl}?${params.toString()}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${await this.getApiToken()}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Replicate API error: ${response.statusText}`);
+      }
+
+      const models = await response.json();
+      return models;
+    } catch (e) {
+      console.error(e);
+      throw new Error(`Failed to get models: ${(e as Error).message}`);
+    }
   }
 
   async generateImage(options: FluxImageOptions): Promise<GeneratedImage> {
@@ -32,7 +72,7 @@ export class FluxService {
       const response = await fetch(`${this.baseUrl}/predictions`, {
         method: 'POST',
         headers: {
-          'Authorization': `Token ${this.apiToken}`,
+          'Authorization': `Token ${await this.getApiToken()}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -100,7 +140,7 @@ export class FluxService {
       try {
         const response = await fetch(`${this.baseUrl}/predictions/${predictionId}`, {
           headers: {
-            'Authorization': `Token ${this.apiToken}`,
+            'Authorization': `Token ${await this.getApiToken()}`,
           },
         });
 
@@ -166,6 +206,7 @@ export class FluxService {
       console.log('Flux generation failed, falling back to DALL-E 3:', (fluxError as Error).message);
 
       try {
+        const openai = await getOpenAI();
         const response = await openai.images.generate({
           model: "dall-e-3",
           prompt: prompt,
